@@ -64,6 +64,13 @@ const server = http.createServer(async (req, res) => {
 
   const pathname = new URL(req.url, "http://localhost").pathname;
 
+  if (pathname === "/config") {
+    const hasLiveData = !!(process.env.ICAL_AIRBNB || process.env.ICAL_BOOKING || process.env.ICAL_LEKKESLAAP);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ hasLiveData }));
+    return;
+  }
+
   if (pathname === "/calendars") {
     console.log("\nFetching calendars...");
     try {

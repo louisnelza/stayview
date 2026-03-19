@@ -456,7 +456,21 @@ function setMode(mode) {
 // ─────────────────────────────────────────────────────────────
 
 renderCalendar();
-loadAll();
+
+// Check server config — default to demo mode if no iCal URLs are configured
+fetch('/config')
+  .then(r => r.json())
+  .then(cfg => {
+    if (!cfg.hasLiveData) {
+      setMode('demo');
+    } else {
+      loadAll();
+    }
+  })
+  .catch(() => {
+    // Can't reach server at all — fall back to demo
+    setMode('demo');
+  });
 </script>
 </body>
 </html>
