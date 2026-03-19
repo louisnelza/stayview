@@ -2,12 +2,12 @@
 
 A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com**, and **Lekkeslaap** into one place. Built with vanilla JS and a lightweight Node.js proxy server — no framework, no database, no dependencies.
 
-[![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://YOUR_APP.onrender.com)
+[![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://stayview.onrender.com)
 ![screenshot](screenshot.png)
 
 ## Live Demo
 
-👉 [your-app.onrender.com](https://YOUR_APP.onrender.com) — click **Demo** in the header to see sample data without any credentials.
+👉 [stayview.onrender.com](https://stayview.onrender.com) — click **Demo** in the header to see sample data without any credentials.
 
 ## Features
 
