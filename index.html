@@ -124,8 +124,8 @@
   <div class="header-right">
     <span id="last-updated"></span>
     <div class="mode-toggle">
-      <button class="mode-btn active" id="btn-live" onclick="setMode('live')">Live</button>
-      <button class="mode-btn" id="btn-demo" onclick="setMode('demo')">Demo</button>
+      <button class="mode-btn" id="btn-live" onclick="setMode('live')">Live</button>
+      <button class="mode-btn active" id="btn-demo" onclick="setMode('demo')">Demo</button>
     </div>
     <button class="refresh-btn" id="refresh-btn" onclick="loadAll()">↻ Refresh</button>
   </div>
@@ -457,19 +457,18 @@ function setMode(mode) {
 
 renderCalendar();
 
-// Check server config — default to demo mode if no iCal URLs are configured
+// Start in demo mode immediately — upgrade to live only if server confirms iCal URLs are set
+setMode('demo');
 fetch('/config')
   .then(r => r.json())
   .then(cfg => {
-    if (!cfg.hasLiveData) {
-      setMode('demo');
-    } else {
-      loadAll();
+    console.log('Server config:', cfg);
+    if (cfg.hasLiveData) {
+      setMode('live');
     }
   })
-  .catch(() => {
-    // Can't reach server at all — fall back to demo
-    setMode('demo');
+  .catch(err => {
+    console.log('Could not reach /config, staying in demo mode:', err);
   });
 </script>
 </body>
