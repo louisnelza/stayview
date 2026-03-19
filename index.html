@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StayView — Rental Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f0d; --bg2: #1a1a16; --bg3: #242420; --bg4: #2e2e28;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #f0ede4; --text2: #9e9b90; --text3: #6a6760;
+    --accent: #c8a96e; --green: #6ab86a; --blue: #5ba3d6;
+    --airbnb: #e8806a; --booking: #5ba3d6; --lekkeslaap: #F47920;
+    --r: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .logo { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--accent); }
+  .logo span { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 300; color: var(--text3); margin-left: 10px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  #last-updated { font-size: 12px; color: var(--text3); }
+  .refresh-btn { background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .refresh-btn:hover { background: var(--bg4); color: var(--text); }
+  .refresh-btn:disabled { opacity: 0.5; cursor: wait; }
+
+  main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 18px; }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--text3); margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 600; line-height: 1; }
+  .stat-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 300px; gap: 18px; }
+
+  .section-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .section-title { font-family: 'DM Serif Display', serif; font-size: 17px; color: var(--text); }
+  .filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-btn { background: transparent; border: 1px solid var(--border); color: var(--text2); padding: 4px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .filter-btn:hover, .filter-btn.active { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+  .filter-btn.active.f-airbnb { border-color: var(--airbnb); color: var(--airbnb); }
+  .filter-btn.active.f-booking { border-color: var(--booking); color: var(--booking); }
+  .filter-btn.active.f-lekkeslaap { border-color: var(--lekkeslaap); color: var(--lekkeslaap); }
+
+  .bookings-list { display: flex; flex-direction: column; gap: 8px; }
+  .booking-card {
+    background: var(--bg2); border-radius: 8px; padding: 12px 14px;
+    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    animation: fadeIn 0.25s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
+  .booking-card.src-airbnb { border-left: 3px solid var(--airbnb); border: 1px solid rgba(232,128,106,0.2); border-left: 3px solid var(--airbnb); }
+  .booking-card.src-booking { border: 1px solid rgba(91,163,214,0.2); border-left: 3px solid var(--booking); }
+  .booking-card.src-lekkeslaap { border: 1px solid rgba(244,121,32,0.2); border-left: 3px solid var(--lekkeslaap); }
+  .booking-card.src-blocked { border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid var(--text3); }
+  .guest-name { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
+  .booking-dates { font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+  .badge-row { display: flex; gap: 6px; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
+  .badge-airbnb { background: rgba(232,128,106,0.15); color: var(--airbnb); }
+  .badge-booking { background: rgba(91,163,214,0.15); color: var(--booking); }
+  .badge-lekkeslaap { background: rgba(244,121,32,0.15); color: var(--lekkeslaap); }
+  .badge-blocked { background: rgba(255,255,255,0.05); color: var(--text3); }
+  .badge-active { background: rgba(244,121,32,0.15); color: var(--green); }
+  .badge-upcoming { background: rgba(200,169,110,0.12); color: var(--accent); }
+  .badge-past { background: rgba(255,255,255,0.04); color: var(--text3); }
+  .nights-num { font-size: 22px; font-weight: 600; text-align: right; line-height: 1; }
+  .nights-lbl { font-size: 11px; color: var(--text3); text-align: right; }
+
+  .cal-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .cal-title { font-size: 14px; font-weight: 500; }
+  .cal-nav { display: flex; gap: 4px; }
+  .cal-nav button { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); width: 26px; height: 26px; border-radius: 5px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .cal-nav button:hover { background: var(--bg4); color: var(--text); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-dow { font-size: 10px; color: var(--text3); text-align: center; padding: 3px 0; text-transform: uppercase; letter-spacing: .06em; }
+  .cal-day { aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:12px; border-radius:5px; cursor:default; transition: background 0.1s; }
+  .cal-day.other { color: transparent; }
+  .cal-day.today { background: rgba(200,169,110,0.15); color: var(--accent); font-weight: 600; }
+  .cal-day.src-airbnb { background: rgba(232,128,106,0.18); color: var(--airbnb); }
+  .cal-day.src-booking { background: rgba(91,163,214,0.18); color: var(--booking); }
+  .cal-day.src-lekkeslaap { background: rgba(244,121,32,0.18); color: var(--lekkeslaap); }
+  .cal-day.src-blocked { background: rgba(255,255,255,0.05); color: var(--text3); }
+  .cal-day.multi { background: rgba(200,169,110,0.15); color: var(--accent); }
+
+  .occ-section { margin-top: 16px; }
+  .occ-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
+  .occ-track { background: var(--bg3); border-radius: 4px; height: 7px; overflow: hidden; }
+  .occ-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 1s ease; }
+  .occ-text { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  .legend { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  .loading { text-align: center; padding: 48px; color: var(--text3); }
+  .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box { background: rgba(162,53,53,0.1); border: 1px solid rgba(162,53,53,0.25); border-radius: 8px; padding: 14px 16px; color: #e8837a; font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
+  .error-box code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  .empty { padding: 40px; text-align: center; color: var(--text3); font-size: 14px; }
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--text3); padding: 6px 0 2px; }
+
+  .demo-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(200,169,110,0.12); border:1px solid rgba(200,169,110,0.3); color:var(--accent); font-size:11px; padding:3px 10px; border-radius:20px; font-weight:500; letter-spacing:0.04em; }
+  .mode-toggle { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .mode-btn { background:transparent; border:none; color:var(--text3); padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit; transition:all 0.15s; }
+  .mode-btn.active { background:var(--bg4); color:var(--text); }
+
+  @media (max-width:900px) {
+    .stat-grid { grid-template-columns: repeat(2,1fr); }
+    .two-col { grid-template-columns: 1fr; }
+    main { padding: 16px; }
+    header { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">StayView <span>Rental Dashboard</span></div>
+  <div class="header-right">
+    <span id="last-updated"></span>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btn-live" onclick="setMode('live')">Live</button>
+      <button class="mode-btn" id="btn-demo" onclick="setMode('demo')">Demo</button>
+    </div>
+    <button class="refresh-btn" id="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Total Bookings</div><div class="stat-value" id="s-total">—</div><div class="stat-sub" id="s-total-sub">across all platforms</div></div>
+    <div class="stat-card"><div class="stat-label">Active Now</div><div class="stat-value" id="s-active" style="color:var(--green)">—</div><div class="stat-sub">guests checked in</div></div>
+    <div class="stat-card"><div class="stat-label">Upcoming (30d)</div><div class="stat-value" id="s-upcoming" style="color:var(--accent)">—</div><div class="stat-sub">next 30 days</div></div>
+    <div class="stat-card"><div class="stat-label">Occupancy (30d)</div><div class="stat-value" id="s-occ" style="color:var(--blue)">—</div><div class="stat-sub" id="s-occ-sub">—</div></div>
+  </div>
+
+  <div id="error-area"></div>
+
+  <div class="two-col">
+    <div>
+      <div class="section-row">
+        <span class="section-title">Bookings</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div class="filter-group" id="src-filters">
+            <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All</button>
+            <button class="filter-btn f-airbnb" data-filter="airbnb" onclick="setFilter('airbnb',this)">Airbnb</button>
+            <button class="filter-btn f-booking" data-filter="booking" onclick="setFilter('booking',this)">Booking.com</button>
+            <button class="filter-btn f-lekkeslaap" data-filter="lekkeslaap" onclick="setFilter('lekkeslaap',this)">Lekkeslaap</button>
+          </div>
+          <div class="filter-group">
+            <button class="filter-btn active" data-view="upcoming" onclick="setView('upcoming',this)">Upcoming</button>
+            <button class="filter-btn" data-view="all" onclick="setView('all',this)">All</button>
+          </div>
+        </div>
+      </div>
+      <div id="bookings-area"><div class="loading"><div class="spinner"></div>Fetching calendars…</div></div>
+    </div>
+
+    <div>
+      <div class="section-row"><span class="section-title">Calendar</span></div>
+      <div class="cal-card">
+        <div class="cal-header">
+          <span class="cal-title" id="cal-title">—</span>
+          <div class="cal-nav">
+            <button onclick="changeMonth(-1)">‹</button>
+            <button onclick="changeMonth(1)">›</button>
+          </div>
+        </div>
+        <div class="cal-grid" id="cal-grid">
+          <div class="cal-dow">M</div><div class="cal-dow">T</div><div class="cal-dow">W</div>
+          <div class="cal-dow">T</div><div class="cal-dow">F</div><div class="cal-dow">S</div><div class="cal-dow">S</div>
+        </div>
+        <div class="occ-section">
+          <div class="occ-label">30-day occupancy</div>
+          <div class="occ-track"><div class="occ-fill" id="occ-fill" style="width:0"></div></div>
+          <div class="occ-text" id="occ-text">—</div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--airbnb)"></div>Airbnb</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--booking)"></div>Booking.com</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--lekkeslaap)"></div>Lekkeslaap</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--text3)"></div>Blocked</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let allBookings = [], currentFilter = 'all', currentView = 'upcoming';
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
+
+function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+
+function parseDate(s) {
+  const c = s.replace(/T.*/,'');
+  if (c.length === 8) return new Date(+c.slice(0,4), +c.slice(4,6)-1, +c.slice(6,8));
+  return new Date(s);
+}
+
+function unescapeIcal(s) {
+  return s.replace(/\\n/g, ' ').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\').trim();
+}
+
+function extractGuestName(summary, description, source) {
+  // Lekkeslaap: extract from "Customer: Name" pattern
+  const customerMatch = (summary + ' ' + description).match(/Customer:\s*([^\\\n,]+)/i);
+  if (customerMatch) return customerMatch[1].trim();
+  // Booking.com anonymises all guests
+  if (source === 'booking') return 'Booking.com Guest';
+  // Airbnb anonymises guests as "Reserved"
+  if (source === 'airbnb' && /^reserved$/i.test(summary.trim())) return 'Airbnb Guest';
+  return summary.split('(')[0].replace(/\\n.*/s, '').trim() || 'Guest';
+}
+
+function parseIcal(text, source) {
+  const bookings = [];
+  const events = text.split('BEGIN:VEVENT'); events.shift();
+  for (const ev of events) {
+    const get = k => { const m = ev.match(new RegExp(k+'[^:]*:([^\r\n]+)')); return m ? m[1].trim() : ''; };
+    const dtstart = get('DTSTART'), dtend = get('DTEND'), uid = get('UID');
+    const rawSummary = unescapeIcal(get('SUMMARY') || 'Guest');
+    const description = unescapeIcal(get('DESCRIPTION'));
+    if (!dtstart || !dtend) continue;
+    const start = parseDate(dtstart), end = parseDate(dtend);
+    if (isNaN(start) || isNaN(end)) continue;
+    const nights = Math.round((end - start) / 86400000);
+    // Booking.com: never blocked (all entries are real bookings)
+    // Airbnb: "Airbnb (Not available)" = blocked, "Reserved" = real booking
+    const isBlocked = source === 'booking'
+      ? false
+      : source === 'airbnb'
+        ? /not available/i.test(rawSummary)
+        : /block|not available|unavailable|closed/i.test(rawSummary);
+    const summary = isBlocked ? rawSummary : extractGuestName(rawSummary, description, source);
+    bookings.push({ uid, source, summary, start, end, nights, isBlocked });
+  }
+  return bookings;
+}
+
+function fmtDate(d) { return d.toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}); }
+function fmtShort(d) { return d.toLocaleDateString('en-ZA', {day:'numeric', month:'short'}); }
+function getStatus(b) {
+  const now = today();
+  if (b.start <= now && b.end > now) return 'active';
+  if (b.start > now) return 'upcoming';
+  return 'past';
+}
+
+async function loadAll() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  document.getElementById('bookings-area').innerHTML = '<div class="loading"><div class="spinner"></div>Fetching calendars…</div>';
+  document.getElementById('error-area').innerHTML = '';
+
+  try {
+    const res = await fetch(`${window.location.origin}/calendars`);
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const results = await res.json();
+    allBookings = [];
+    const failed = [];
+    for (const r of results) {
+      if (r.success && r.data.includes('BEGIN:VCALENDAR')) {
+        allBookings.push(...parseIcal(r.data, r.name));
+      } else {
+        failed.push(r.name);
+      }
+    }
+    allBookings.sort((a,b) => a.start - b.start);
+    if (failed.length) {
+      document.getElementById('error-area').innerHTML = `<div class="error-box">Could not load: ${failed.join(', ')}. Check that the iCal URLs are still valid.</div>`;
+    }
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-ZA', {hour:'2-digit', minute:'2-digit'});
+    updateStats(); renderBookings(); renderCalendar();
+  } catch(e) {
+    document.getElementById('bookings-area').innerHTML = '';
+    document.getElementById('error-area').innerHTML = `
+      <div class="error-box">
+        <strong>Cannot connect to server.</strong><br><br>
+        Make sure the server is running on your Raspberry Pi:<br><br>
+        <code>node server.js</code><br><br>
+        Then refresh this page.
+      </div>`;
+  }
+  btn.disabled = false; btn.textContent = '↻ Refresh';
+}
+
+function updateStats() {
+  const now = today(), in30 = new Date(now); in30.setDate(in30.getDate()+30);
+  const real = allBookings.filter(b => !b.isBlocked);
+  const active = real.filter(b => getStatus(b) === 'active').length;
+  const up30 = real.filter(b => b.start >= now && b.start < in30).length;
+  let bookedNights = 0;
+  for (let d = new Date(now); d < in30; d.setDate(d.getDate()+1)) {
+    if (real.some(b => b.start <= d && b.end > d)) bookedNights++;
+  }
+  const occ = Math.round((bookedNights/30)*100);
+  document.getElementById('s-total').textContent = real.length;
+  document.getElementById('s-active').textContent = active;
+  document.getElementById('s-upcoming').textContent = up30;
+  document.getElementById('s-occ').textContent = occ + '%';
+  document.getElementById('s-occ-sub').textContent = bookedNights + ' of 30 nights';
+  setTimeout(() => {
+    document.getElementById('occ-fill').style.width = occ + '%';
+    document.getElementById('occ-text').textContent = bookedNights + ' of 30 nights booked (' + occ + '%)';
+  }, 100);
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('#src-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderBookings();
+}
+
+function setView(v, el) {
+  currentView = v;
+  document.querySelectorAll('.filter-group:last-child .filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderBookings();
+}
+
+function renderBookings() {
+  const now = today();
+  const filtered = allBookings.filter(b => {
+    if (currentFilter !== 'all' && b.source !== currentFilter) return false;
+    if (currentView === 'upcoming') return b.end >= now;
+    return true;
+  });
+  const area = document.getElementById('bookings-area');
+  if (!filtered.length) { area.innerHTML = '<div class="empty">No bookings for selected filters.</div>'; return; }
+  const LABELS = { airbnb:'Airbnb', booking:'Booking.com', lekkeslaap:'Lekkeslaap' };
+  let html = '<div class="bookings-list">', lastStatus = null;
+  for (const b of filtered) {
+    const status = getStatus(b);
+    if (currentView === 'upcoming' && status !== lastStatus) {
+      if (status === 'active') html += '<div class="section-label">Currently Active</div>';
+      else if (status === 'upcoming') html += '<div class="section-label">Upcoming</div>';
+      lastStatus = status;
+    }
+    const name = b.isBlocked ? (b.summary || 'Blocked') : b.summary.split('(')[0].trim();
+    const srcKey = b.isBlocked ? 'blocked' : b.source;
+    const srcLabel = b.isBlocked ? 'Blocked' : (LABELS[b.source] || b.source);
+    html += `
+      <div class="booking-card src-${srcKey}">
+        <div>
+          <div class="guest-name">${escHtml(name)}</div>
+          <div class="booking-dates">${fmtShort(b.start)} → ${fmtShort(b.end)}</div>
+          <div class="badge-row">
+            <span class="badge badge-${srcKey}">${srcLabel}</span>
+            <span class="badge badge-${status}">${status === 'active' ? 'Checked In' : status === 'upcoming' ? 'Upcoming' : 'Past'}</span>
+          </div>
+        </div>
+        <div>
+          <div class="nights-num">${b.nights}</div>
+          <div class="nights-lbl">nights</div>
+        </div>
+      </div>`;
+  }
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = MONTHS[calMonth] + ' ' + calYear;
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay = new Date(calYear, calMonth+1, 0);
+  let dow = firstDay.getDay(); dow = dow===0 ? 6 : dow-1;
+  const grid = document.getElementById('cal-grid');
+  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+  const now = today();
+  for (let i = 0; i < dow; i++) { const el = document.createElement('div'); el.className='cal-day other'; grid.appendChild(el); }
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(calYear, calMonth, d);
+    const el = document.createElement('div'); el.className = 'cal-day'; el.textContent = d;
+    if (date.getTime() === now.getTime()) el.classList.add('today');
+    const matching = allBookings.filter(b => b.start <= date && b.end > date);
+    if (matching.length > 0) {
+      const srcs = [...new Set(matching.map(b => b.isBlocked ? 'blocked' : b.source))];
+      el.classList.add(srcs.length === 1 ? 'src-' + srcs[0] : 'multi');
+      el.title = matching.map(b => b.summary).join(', ');
+    }
+    grid.appendChild(el);
+  }
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+// ── Demo data ───────────────────────────────────────────────
+function makeDemoBookings() {
+  const base = today();
+  const d = (offsetDays) => { const x = new Date(base); x.setDate(x.getDate() + offsetDays); return x; };
+  let uid = 1;
+  const b = (source, name, startOff, nights, isBlocked=false) => ({
+    uid: 'demo-' + uid++, source, summary: name,
+    start: d(startOff), end: d(startOff + nights),
+    nights, isBlocked
+  });
+  return [
+    b('airbnb',      'Airbnb Guest',       -2,  4),
+    b('lekkeslaap',  'Pieter van Wyk',      3,  3),
+    b('booking',     'Booking.com Guest',   5,  2),
+    b('airbnb',      'Airbnb Guest',        9,  5),
+    b('lekkeslaap',  'Anri Botha',         12,  7),
+    b('booking',     'Booking.com Guest',  14,  3),
+    b('airbnb',      'Airbnb Guest',       20,  4),
+    b('lekkeslaap',  'Kobus Joubert',      24,  2),
+    b('booking',     'Booking.com Guest',  27,  6),
+    b('airbnb',      'Airbnb Guest',       33,  3),
+    b('lekkeslaap',  'Sarel du Plessis',   38,  5),
+    b('booking',     'Booking.com Guest',  44,  4),
+    b('airbnb',      'Airbnb Guest',       50,  3),
+    b('lekkeslaap',  'Mia Pretorius',      55,  6),
+    b('airbnb',      null, 6, 2, true),
+    b('lekkeslaap',  null, 18, 1, true),
+  ].sort((a,b) => a.start - b.start);
+}
+
+let currentMode = 'live';
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btn-live').classList.toggle('active', mode === 'live');
+  document.getElementById('btn-demo').classList.toggle('active', mode === 'demo');
+  const demoTag = document.getElementById('demo-tag');
+  if (mode === 'demo') {
+    if (!demoTag) {
+      const tag = document.createElement('span');
+      tag.id = 'demo-tag';
+      tag.className = 'demo-badge';
+      tag.textContent = '⬡ Demo mode';
+      document.querySelector('.logo').appendChild(tag);
+    }
+    allBookings = makeDemoBookings();
+    document.getElementById('error-area').innerHTML = '';
+    document.getElementById('last-updated').textContent = 'Demo data';
+    updateStats(); renderBookings(); renderCalendar();
+  } else {
+    if (demoTag) demoTag.remove();
+    loadAll();
+  }
+}
+// ─────────────────────────────────────────────────────────────
+
+renderCalendar();
+loadAll();
+</script>
+</body>
+</html>
