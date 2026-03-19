@@ -2,7 +2,12 @@
 
 A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com**, and **Lekkeslaap** into one place. Built with vanilla JS and a lightweight Node.js proxy server — no framework, no database, no dependencies.
 
-![Demo](https://img.shields.io/badge/demo-live-brightgreen)
+[![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://YOUR_APP.onrender.com)
+![screenshot](screenshot.png)
+
+## Live Demo
+
+👉 [your-app.onrender.com](https://YOUR_APP.onrender.com) — click **Demo** in the header to see sample data without any credentials.
 
 ## Features
 
@@ -12,10 +17,6 @@ A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com*
 - Filters by platform and upcoming/all view
 - **Demo mode** — toggle to see sample data without needing live credentials
 - Self-hosted on a Raspberry Pi or any Node.js server
-
-## Demo
-
-Click **Demo** in the header toggle to see the dashboard with sample data — no setup required.
 
 ## Getting Started
 
@@ -62,15 +63,22 @@ sudo systemctl enable stayview
 sudo systemctl start stayview
 ```
 
-## Deploying to Railway / Render (live URL)
+## Deploying to Render (live URL)
 
-1. Push to GitHub
-2. Create a new project on [Railway](https://railway.app) or [Render](https://render.com) and connect your repo
-3. Add your environment variables in the platform dashboard:
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+1. Go to [render.com](https://render.com) and sign in with GitHub
+2. **New → Web Service → Connect** your `stayview` repo
+3. Settings:
+   - **Runtime**: Node
+   - **Build command**: *(leave empty)*
+   - **Start command**: `node server.js`
+4. Under **Environment**, add your 3 variables:
    - `ICAL_AIRBNB`
    - `ICAL_BOOKING`
    - `ICAL_LEKKESLAAP`
-4. Deploy — the `npm start` script runs `node server.js` automatically
+5. Click **Deploy** — you'll get a URL like `https://stayview.onrender.com`
+6. Update the demo link and badge at the top of this README with your URL
 
 ## Where to find your iCal URLs
 
