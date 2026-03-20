@@ -3,11 +3,34 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
-// Re-read .env on every call so changes take effect without restart
-function loadEnv() {
-  const envPath = require("path").join(__dirname, ".env");
-  if (require("fs").existsSync(envPath)) {
-    require("fs").readFileSync(envPath, "utf8")
+// Support both config.txt (user-friendly) and .env (developer)
+function loadConfig() {
+  const fs = require("fs");
+  const path = require("path");
+
+  // Determine base directory — works both for Node and pkg executables
+  const baseDir = process.pkg
+    ? path.dirname(process.execPath)
+    : __dirname;
+
+  // Try config.txt first (non-technical users)
+  const configPath = path.join(baseDir, "config.txt");
+  if (fs.existsSync(configPath)) {
+    fs.readFileSync(configPath, "utf8")
+      .split("\n")
+      .forEach(line => {
+        line = line.trim();
+        if (!line || line.startsWith("#")) return;
+        const [key, ...val] = line.split("=");
+        if (key && val.length) process.env[key.trim()] = val.join("=").trim();
+      });
+    return;
+  }
+
+  // Fall back to .env (developers)
+  const envPath = path.join(__dirname, ".env");
+  if (fs.existsSync(envPath)) {
+    fs.readFileSync(envPath, "utf8")
       .split("\n")
       .forEach(line => {
         const [key, ...val] = line.split("=");
@@ -17,7 +40,7 @@ function loadEnv() {
 }
 
 function getSources() {
-  loadEnv();
+  loadConfig();
   return {
     airbnb:     process.env.ICAL_AIRBNB     || null,
     booking:    process.env.ICAL_BOOKING    || null,
@@ -114,7 +137,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === "/" || pathname === "/index.html") {
-    const htmlPath = path.join(__dirname, "index.html");
+    const baseDir = process.pkg ? path.dirname(process.execPath) : __dirname;
+    const htmlPath = path.join(baseDir, "index.html");
     if (fs.existsSync(htmlPath)) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(fs.readFileSync(htmlPath));

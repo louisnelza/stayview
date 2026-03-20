@@ -1,0 +1,24 @@
+{
+  "name": "stayview",
+  "version": "1.0.0",
+  "description": "Short-term rental booking dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "pkg server.js --targets node18-win-x64,node18-macos-x64,node18-linux-x64 --output dist/stayview"
+  },
+  "pkg": {
+    "targets": [
+      "node18-win-x64",
+      "node18-macos-x64",
+      "node18-linux-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

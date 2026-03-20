@@ -1,0 +1,15 @@
+# StayView Configuration
+# --------------------
+# Paste your iCal URLs below. Save this file and restart StayView.
+# Lines starting with # are comments and are ignored.
+#
+# Where to find your iCal URLs:
+#   Airbnb:      Calendar -> Availability settings -> Export calendar
+#   Booking.com: Property -> Calendar -> Export calendar
+#   Lekkeslaap:  Supplier dashboard -> Calendar -> iCal export
+#
+# Leave a line blank or as-is if you don't use that platform.
+
+ICAL_AIRBNB=
+ICAL_BOOKING=
+ICAL_LEKKESLAAP=
