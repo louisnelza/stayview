@@ -264,17 +264,25 @@ async function loadAll() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const results = await res.json();
     allBookings = [];
-    const failed = [];
+    const warnings = [];
     for (const r of results) {
-      if (r.success && r.data.includes('BEGIN:VCALENDAR')) {
-        allBookings.push(...parseIcal(r.data, r.name));
-      } else {
-        failed.push(r.name);
+      if (!r.success) {
+        warnings.push(`<strong>${r.name}</strong>: ${r.error || 'fetch failed'}`);
+        continue;
       }
+      if (!r.data || !r.data.includes('BEGIN:VCALENDAR')) {
+        warnings.push(`<strong>${r.name}</strong>: response was not a valid iCal feed`);
+        continue;
+      }
+      const parsed = parseIcal(r.data, r.name);
+      if (parsed.length === 0 && r.data.includes('BEGIN:VCALENDAR') && !r.data.includes('BEGIN:VEVENT')) {
+        warnings.push(`<strong>${r.name}</strong>: calendar synced but contains no events`);
+      }
+      allBookings.push(...parsed);
     }
     allBookings.sort((a,b) => a.start - b.start);
-    if (failed.length) {
-      document.getElementById('error-area').innerHTML = `<div class="error-box">Could not load: ${failed.join(', ')}. Check that the iCal URLs are still valid.</div>`;
+    if (warnings.length) {
+      document.getElementById('error-area').innerHTML = `<div class="error-box">⚠️ Some calendars had issues:<br><br>${warnings.join('<br>')}</div>`;
     }
     document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-ZA', {hour:'2-digit', minute:'2-digit'});
     updateStats(); renderBookings(); renderCalendar();
