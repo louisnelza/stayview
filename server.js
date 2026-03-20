@@ -3,21 +3,27 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
-// Load .env file if present (local development)
-if (require("fs").existsSync(require("path").join(__dirname, ".env"))) {
-  require("fs").readFileSync(require("path").join(__dirname, ".env"), "utf8")
-    .split("\n")
-    .forEach(line => {
-      const [key, ...val] = line.split("=");
-      if (key && val.length) process.env[key.trim()] = val.join("=").trim();
-    });
+// Re-read .env on every call so changes take effect without restart
+function loadEnv() {
+  const envPath = require("path").join(__dirname, ".env");
+  if (require("fs").existsSync(envPath)) {
+    require("fs").readFileSync(envPath, "utf8")
+      .split("\n")
+      .forEach(line => {
+        const [key, ...val] = line.split("=");
+        if (key && val.length) process.env[key.trim()] = val.join("=").trim();
+      });
+  }
 }
 
-const SOURCES = {
-  airbnb:      process.env.ICAL_AIRBNB,
-  booking:     process.env.ICAL_BOOKING,
-  lekkeslaap:  process.env.ICAL_LEKKESLAAP,
-};
+function getSources() {
+  loadEnv();
+  return {
+    airbnb:     process.env.ICAL_AIRBNB     || null,
+    booking:    process.env.ICAL_BOOKING    || null,
+    lekkeslaap: process.env.ICAL_LEKKESLAAP || null,
+  };
+}
 
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -65,7 +71,8 @@ const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
 
   if (pathname === "/config") {
-    const hasLiveData = !!(process.env.ICAL_AIRBNB || process.env.ICAL_BOOKING || process.env.ICAL_LEKKESLAAP);
+    const sources = getSources();
+    const hasLiveData = Object.values(sources).some(Boolean);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ hasLiveData }));
     return;
@@ -73,15 +80,24 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === "/calendars") {
     console.log("\nFetching calendars...");
+    const sources = getSources();
     try {
       const results = await Promise.all(
-        Object.entries(SOURCES).filter(([, u]) => u).map(async ([name, srcUrl]) => {
+        Object.entries(sources).filter(([, u]) => u).map(async ([name, srcUrl]) => {
           try {
             const text = await fetchUrl(srcUrl);
-            const valid = text.includes("BEGIN:VCALENDAR");
-            console.log(`  [${name}] ${valid ? "OK" : "Got response but no VCALENDAR"} (${text.length} chars)`);
-            if (!valid) console.log(`  [${name}] First 300 chars: ${text.slice(0, 300)}`);
-            return { name, success: valid, data: valid ? text : "", error: valid ? null : "Response did not contain VCALENDAR data" };
+            const hasCalendar = text.includes("BEGIN:VCALENDAR");
+            const hasEvents   = text.includes("BEGIN:VEVENT");
+            if (!hasCalendar) {
+              console.log(`  [${name}] INVALID — no VCALENDAR. First 200 chars: ${text.slice(0, 200)}`);
+              return { name, success: false, data: "", error: "Response was not a valid iCal feed (no BEGIN:VCALENDAR)" };
+            }
+            if (!hasEvents) {
+              console.log(`  [${name}] EMPTY — valid iCal but no events`);
+              return { name, success: true, data: text, error: null, empty: true };
+            }
+            console.log(`  [${name}] OK (${text.length} chars)`);
+            return { name, success: true, data: text, error: null };
           } catch (e) {
             console.log(`  [${name}] FAILED: ${e.message}`);
             return { name, success: false, data: "", error: e.message };
