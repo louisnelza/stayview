@@ -137,14 +137,26 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === "/" || pathname === "/index.html") {
-    const baseDir = process.pkg ? path.dirname(process.execPath) : __dirname;
-    const htmlPath = path.join(baseDir, "index.html");
-    if (fs.existsSync(htmlPath)) {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-      res.end(fs.readFileSync(htmlPath));
+    // When running as a pkg executable, index.html is bundled inside.
+    // When running as plain Node, check next to the script first, then fall back to bundled.
+    let html = null;
+    const externalPath = path.join(
+      process.pkg ? path.dirname(process.execPath) : __dirname,
+      "index.html"
+    );
+    if (fs.existsSync(externalPath)) {
+      // External file takes priority — allows updates without rebuilding the executable
+      html = fs.readFileSync(externalPath, "utf8");
     } else {
-      res.writeHead(404); res.end("index.html not found");
+      try {
+        // Fall back to bundled version inside the executable
+        html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
+      } catch(e) {
+        res.writeHead(404); res.end("index.html not found"); return;
+      }
     }
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(html);
     return;
   }
 
