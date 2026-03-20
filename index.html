@@ -265,21 +265,41 @@ async function loadAll() {
     const results = await res.json();
     allBookings = [];
     const warnings = [];
+    const LABELS = { airbnb: 'Airbnb', booking: 'Booking.com', lekkeslaap: 'Lekkeslaap' };
+
+    // Load previous booking counts from localStorage to detect silent empty responses
+    let prevCounts = {};
+    try { prevCounts = JSON.parse(localStorage.getItem('stayview_counts') || '{}'); } catch(e) {}
+    const newCounts = {};
+
     for (const r of results) {
       if (!r.success) {
-        warnings.push(`<strong>${r.name}</strong>: ${r.error || 'fetch failed'}`);
+        warnings.push(`<strong>${LABELS[r.name] || r.name}</strong>: ${r.error || 'fetch failed'}`);
         continue;
       }
       if (!r.data || !r.data.includes('BEGIN:VCALENDAR')) {
-        warnings.push(`<strong>${r.name}</strong>: response was not a valid iCal feed`);
+        warnings.push(`<strong>${LABELS[r.name] || r.name}</strong>: response was not a valid iCal feed`);
         continue;
       }
       const parsed = parseIcal(r.data, r.name);
-      if (parsed.length === 0 && r.data.includes('BEGIN:VCALENDAR') && !r.data.includes('BEGIN:VEVENT')) {
-        warnings.push(`<strong>${r.name}</strong>: calendar synced but contains no events`);
+      newCounts[r.name] = parsed.length;
+
+      // Warn if a source that previously had bookings now returns zero
+      if (parsed.length === 0 && prevCounts[r.name] > 0) {
+        warnings.push(`<strong>${LABELS[r.name] || r.name}</strong>: previously had ${prevCounts[r.name]} booking(s) but now returns empty — possible broken sync or expired iCal URL`);
+      } else if (parsed.length === 0 && !r.data.includes('BEGIN:VEVENT')) {
+        warnings.push(`<strong>${LABELS[r.name] || r.name}</strong>: calendar connected but contains no events`);
       }
       allBookings.push(...parsed);
     }
+
+    // Save counts for next comparison (only save non-zero counts so we don't overwrite good data with empty)
+    const updatedCounts = { ...prevCounts };
+    for (const [name, count] of Object.entries(newCounts)) {
+      if (count > 0) updatedCounts[name] = count;
+    }
+    try { localStorage.setItem('stayview_counts', JSON.stringify(updatedCounts)); } catch(e) {}
+
     allBookings.sort((a,b) => a.start - b.start);
     if (warnings.length) {
       document.getElementById('error-area').innerHTML = `<div class="error-box">⚠️ Some calendars had issues:<br><br>${warnings.join('<br>')}</div>`;
