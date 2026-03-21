@@ -1,0 +1,48 @@
+/* shared.css — CSS variables, reset, and components used by both pages */
+
+/* ── Google Fonts ─────────────────────────────────────────────
+   Import in each HTML file:
+   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+*/
+
+/* ── Reset ────────────────────────────────────────────────────*/
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Source colours ───────────────────────────────────────────*/
+:root {
+  --airbnb:     #e8806a;
+  --booking:    #5ba3d6;
+  --lekkeslaap: #F47920;
+  --direct:     #7a6abf;
+
+  /* Semantic */
+  --color-success: #6ab86a;
+  --color-warning: #c8a96e;
+  --color-danger:  #e8837a;
+}
+
+/* ── Spinner ──────────────────────────────────────────────────*/
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Badges ───────────────────────────────────────────────────*/
+.badge { font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
+
+.badge-airbnb     { background: rgba(232,128,106,0.15); color: var(--airbnb); }
+.badge-booking    { background: rgba(91,163,214,0.15);  color: var(--booking); }
+.badge-lekkeslaap { background: rgba(244,121,32,0.15);  color: var(--lekkeslaap); }
+.badge-direct     { background: rgba(122,106,191,0.15); color: var(--direct); }
+.badge-blocked    { background: rgba(255,255,255,0.05); color: #6a6760; }
+
+/* ── Booking card source borders ─────────────────────────────*/
+.booking-card.src-airbnb     { border: 1px solid rgba(232,128,106,0.2); border-left: 3px solid var(--airbnb); }
+.booking-card.src-booking    { border: 1px solid rgba(91,163,214,0.2);  border-left: 3px solid var(--booking); }
+.booking-card.src-lekkeslaap { border: 1px solid rgba(244,121,32,0.2);  border-left: 3px solid var(--lekkeslaap); }
+.booking-card.src-direct     { border: 1px solid rgba(122,106,191,0.2); border-left: 3px solid var(--direct); }
+.booking-card.src-blocked    { border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid #6a6760; }
+
+/* ── Calendar day source colours ─────────────────────────────*/
+.cal-day.src-airbnb     { background: rgba(232,128,106,0.18); color: var(--airbnb); }
+.cal-day.src-booking    { background: rgba(91,163,214,0.18);  color: var(--booking); }
+.cal-day.src-lekkeslaap { background: rgba(244,121,32,0.18);  color: var(--lekkeslaap); }
+.cal-day.src-direct     { background: rgba(122,106,191,0.18); color: var(--direct); }
+.cal-day.src-blocked    { background: rgba(255,255,255,0.05); color: #6a6760; }
