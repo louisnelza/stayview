@@ -5,109 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Book Direct</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #faf9f6; --bg2: #ffffff; --bg3: #f2f0eb;
-    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
-    --text: #1a1a16; --text2: #6a6760; --text3: #9e9b90;
-    --accent: #b8935a; --accent2: #a07d48;
-    --green: #3a7a3a; --red: #a33030;
-    --r: 10px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-
-  /* Header */
-  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
-  .prop-name { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text); }
-  .back-link { font-size: 13px; color: var(--text2); text-decoration: none; display: flex; align-items: center; gap: 5px; }
-  .back-link:hover { color: var(--accent); }
-
-  /* Hero */
-  .hero { position: relative; height: 260px; background: var(--bg3); overflow: hidden; }
-  .hero img { width: 100%; height: 100%; object-fit: cover; }
-  .hero-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #e8e0d0 0%, #d4c9b0 100%); }
-  .hero-placeholder svg { opacity: 0.3; }
-  .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.4)); }
-  .hero-text { position: absolute; bottom: 20px; left: 24px; color: white; }
-  .hero-text h1 { font-family: 'DM Serif Display', serif; font-size: 28px; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
-  .hero-text p { font-size: 14px; opacity: 0.9; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
-
-  /* Layout */
-  .page { max-width: 960px; margin: 0 auto; padding: 28px 20px; display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
-  @media(max-width:700px) { .page { grid-template-columns: 1fr; } }
-
-  /* Card */
-  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 22px 24px; }
-  .card + .card { margin-top: 16px; }
-  .card-title { font-family: 'DM Serif Display', serif; font-size: 17px; margin-bottom: 16px; }
-
-  /* Description */
-  .prop-desc { font-size: 14px; line-height: 1.7; color: var(--text2); }
-  .prop-location { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); margin-top: 10px; }
-
-  /* Date picker */
-  .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-  .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); }
-  .field input, .field select, .field textarea {
-    background: var(--bg); border: 1px solid var(--border2); border-radius: 7px;
-    padding: 9px 12px; font-size: 14px; font-family: inherit; color: var(--text);
-    transition: border-color 0.15s; outline: none; width: 100%;
-  }
-  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
-  .field textarea { resize: vertical; min-height: 80px; }
-  .field input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
-
-  /* Availability indicator */
-  .avail-msg { font-size: 13px; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; display: none; }
-  .avail-msg.available { background: rgba(58,122,58,0.1); color: var(--green); display: block; }
-  .avail-msg.unavailable { background: rgba(163,48,48,0.1); color: var(--red); display: block; }
-  .avail-msg.checking { background: rgba(0,0,0,0.05); color: var(--text2); display: block; }
-
-  /* Guest form */
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .form-grid .full { grid-column: 1 / -1; }
-  @media(max-width:500px) { .form-grid { grid-template-columns: 1fr; } }
-
-  /* Summary card (sticky) */
-  .summary-card { position: sticky; top: 20px; }
-  .rate-display { font-size: 26px; font-weight: 600; color: var(--text); line-height: 1; }
-  .rate-display span { font-size: 14px; font-weight: 400; color: var(--text2); }
-  .summary-lines { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-  .summary-line { display: flex; justify-content: space-between; font-size: 14px; }
-  .summary-line.total { font-weight: 500; font-size: 15px; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
-  .summary-empty { font-size: 13px; color: var(--text3); line-height: 1.6; }
-
-  /* Submit */
-  .submit-btn {
-    width: 100%; padding: 13px; border-radius: 8px; border: none;
-    background: var(--accent); color: white; font-size: 15px; font-weight: 500;
-    cursor: pointer; font-family: inherit; margin-top: 16px; transition: background 0.2s;
-  }
-  .submit-btn:hover { background: var(--accent2); }
-  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Steps */
-  .steps { display: flex; gap: 6px; margin-bottom: 20px; }
-  .step { flex: 1; height: 3px; border-radius: 2px; background: var(--bg3); }
-  .step.done { background: var(--accent); }
-  .step.active { background: var(--accent); opacity: 0.5; }
-
-  /* Success */
-  .success-box { text-align: center; padding: 32px 20px; }
-  .success-icon { font-size: 48px; margin-bottom: 14px; }
-  .success-box h2 { font-family: 'DM Serif Display', serif; font-size: 24px; margin-bottom: 8px; }
-  .success-box p { font-size: 14px; color: var(--text2); line-height: 1.7; }
-  .success-ref { font-size: 12px; color: var(--text3); margin-top: 16px; font-family: monospace; background: var(--bg3); padding: 6px 12px; border-radius: 4px; display: inline-block; }
-
-  /* Error */
-  .error-msg { font-size: 13px; color: var(--red); background: rgba(163,48,48,0.08); border-radius: 6px; padding: 10px 12px; margin-top: 12px; display: none; }
-  .error-msg.show { display: block; }
-
-  .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
-  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--text3); margin-bottom: 10px; }
-</style>
+<link rel="stylesheet" href="/css/shared.css">
+<link rel="stylesheet" href="/css/booking.css">
 </head>
 <body>
 
@@ -119,7 +18,8 @@
 <div class="hero" id="hero">
   <div class="hero-placeholder" id="hero-placeholder">
     <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1">
-      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
     </svg>
   </div>
   <div class="hero-overlay"></div>
@@ -132,17 +32,18 @@
 <div class="page">
   <!-- Left column -->
   <div>
-    <!-- About -->
     <div class="card">
       <div class="card-title">About this property</div>
       <p class="prop-desc" id="prop-desc">Loading…</p>
       <div class="prop-location" id="prop-location" style="display:none">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
         <span id="prop-location-text"></span>
       </div>
     </div>
 
-    <!-- Dates -->
     <div class="card">
       <div class="steps">
         <div class="step active" id="step1"></div>
@@ -162,20 +63,16 @@
       </div>
       <div class="field" style="margin-bottom:14px">
         <label>Guests</label>
-        <select id="guests" onchange="updateSummary()">
-          <option>1</option><option>2</option><option>3</option><option>4</option>
-          <option>5</option><option>6</option><option>7</option><option>8</option>
-        </select>
+        <select id="guests" onchange="updateSummary()"></select>
       </div>
       <div class="avail-msg" id="avail-msg"></div>
 
-      <!-- Guest details (shown after availability confirmed) -->
       <div id="guest-form" style="display:none">
         <hr class="divider">
         <div class="section-label">Your details</div>
         <div class="form-grid">
           <div class="field">
-            <label>First & last name *</label>
+            <label>First &amp; last name *</label>
             <input type="text" id="g-name" placeholder="Jane Smith">
           </div>
           <div class="field">
@@ -200,16 +97,14 @@
     </div>
   </div>
 
-  <!-- Right column — summary -->
+  <!-- Right column -->
   <div class="summary-card">
     <div class="card">
-      <div id="summary-content">
-        <div class="rate-display" id="rate-display" style="display:none"></div>
-        <p class="summary-empty" id="summary-empty">Select your dates to see pricing and availability.</p>
-        <div class="summary-lines" id="summary-lines" style="display:none">
-          <div class="summary-line"><span id="sl-nights"></span><span id="sl-rate"></span></div>
-          <div class="summary-line total"><span>Total</span><span id="sl-total"></span></div>
-        </div>
+      <div class="rate-display" id="rate-display" style="display:none"></div>
+      <p class="summary-empty" id="summary-empty">Select your dates to see pricing and availability.</p>
+      <div class="summary-lines" id="summary-lines" style="display:none">
+        <div class="summary-line"><span id="sl-nights"></span><span id="sl-rate"></span></div>
+        <div class="summary-line total"><span>Total</span><span id="sl-total"></span></div>
       </div>
     </div>
     <div class="card" style="margin-top:12px">
@@ -221,8 +116,8 @@
   </div>
 </div>
 
-<!-- Success screen (hidden initially) -->
-<div id="success-screen" style="display:none; max-width:560px; margin:40px auto; padding:0 20px;">
+<!-- Success screen -->
+<div id="success-screen" style="display:none;max-width:560px;margin:40px auto;padding:0 20px">
   <div class="card success-box">
     <div class="success-icon">🎉</div>
     <h2>Booking request sent!</h2>
@@ -232,218 +127,7 @@
   </div>
 </div>
 
-<script>
-let blockedDates = [];
-let property = {};
-let checkingAvailability = false;
-
-async function init() {
-  try {
-    const [propRes, availRes] = await Promise.all([
-      fetch('/api/property').then(r => r.json()),
-      fetch('/api/availability').then(r => r.json())
-    ]);
-    property = propRes;
-    blockedDates = availRes.blocked || [];
-
-    // Set property info
-    document.getElementById('prop-name').textContent = property.name;
-    document.getElementById('hero-title').textContent = property.name;
-    document.getElementById('prop-desc').textContent = property.description;
-    document.title = 'Book — ' + property.name;
-
-    if (property.location) {
-      document.getElementById('prop-location').style.display = 'flex';
-      document.getElementById('prop-location-text').textContent = property.location;
-      document.getElementById('hero-location').textContent = property.location;
-    }
-
-    if (property.photo_url) {
-      const hero = document.getElementById('hero');
-      const img = document.createElement('img');
-      img.src = property.photo_url;
-      img.alt = property.name;
-      hero.insertBefore(img, hero.firstChild);
-      document.getElementById('hero-placeholder').style.display = 'none';
-    }
-
-    if (property.nightly_rate > 0) {
-      const rateEl = document.getElementById('rate-display');
-      rateEl.style.display = 'block';
-      rateEl.innerHTML = `${fmtCurrency(property.nightly_rate)} <span>/ night</span>`;
-    }
-
-    // Set min date to today
-    const todayStr = new Date().toISOString().slice(0,10);
-    document.getElementById('checkin').min = todayStr;
-    document.getElementById('checkout').min = todayStr;
-
-    // Max guests
-    const guestSel = document.getElementById('guests');
-    guestSel.innerHTML = '';
-    for (let i = 1; i <= (property.max_guests || 10); i++) {
-      guestSel.innerHTML += `<option value="${i}">${i} guest${i>1?'s':''}</option>`;
-    }
-  } catch(e) {
-    console.error('Init failed:', e);
-  }
-}
-
-function fmtCurrency(amount) {
-  if (!amount) return '';
-  const sym = property.currency === 'ZAR' ? 'R' : (property.currency || '') + ' ';
-  return sym + amount.toLocaleString('en-ZA', {minimumFractionDigits:0});
-}
-
-function fmtDate(s) {
-  return new Date(s + 'T00:00:00').toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'});
-}
-
-function isDateBlocked(dateStr) {
-  return blockedDates.includes(dateStr);
-}
-
-function datesInRange(checkin, checkout) {
-  const dates = [];
-  let d = new Date(checkin + 'T00:00:00');
-  const end = new Date(checkout + 'T00:00:00');
-  while (d < end) { dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
-  return dates;
-}
-
-function onDatesChange() {
-  const checkin = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-
-  // Ensure checkout is after checkin
-  if (checkin) {
-    const minCheckout = new Date(checkin + 'T00:00:00');
-    minCheckout.setDate(minCheckout.getDate() + (property.min_nights || 1));
-    document.getElementById('checkout').min = minCheckout.toISOString().slice(0,10);
-    if (checkout && checkout <= checkin) {
-      document.getElementById('checkout').value = minCheckout.toISOString().slice(0,10);
-    }
-  }
-
-  updateSummary();
-  checkAvailability();
-}
-
-function checkAvailability() {
-  const checkin = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-  const msg = document.getElementById('avail-msg');
-  const guestForm = document.getElementById('guest-form');
-  const step2 = document.getElementById('step2');
-  const step3 = document.getElementById('step3');
-
-  if (!checkin || !checkout || checkout <= checkin) {
-    msg.className = 'avail-msg';
-    guestForm.style.display = 'none';
-    step2.className = 'step'; step3.className = 'step';
-    return;
-  }
-
-  const nights = Math.round((new Date(checkout) - new Date(checkin)) / 86400000);
-  if (property.min_nights && nights < property.min_nights) {
-    msg.className = 'avail-msg unavailable';
-    msg.textContent = `Minimum stay is ${property.min_nights} night${property.min_nights>1?'s':''}.`;
-    guestForm.style.display = 'none';
-    return;
-  }
-
-  const range = datesInRange(checkin, checkout);
-  const conflicting = range.filter(d => isDateBlocked(d));
-
-  if (conflicting.length > 0) {
-    msg.className = 'avail-msg unavailable';
-    msg.textContent = `Sorry, these dates are not available. Please choose different dates.`;
-    guestForm.style.display = 'none';
-    step2.className = 'step'; step3.className = 'step';
-  } else {
-    msg.className = 'avail-msg available';
-    msg.textContent = `✓ Available for ${nights} night${nights>1?'s':''}! Fill in your details below.`;
-    guestForm.style.display = 'block';
-    step2.className = 'step done'; step3.className = 'step active';
-  }
-}
-
-function updateSummary() {
-  const checkin = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-  const lines = document.getElementById('summary-lines');
-  const empty = document.getElementById('summary-empty');
-
-  if (!checkin || !checkout || checkout <= checkin) {
-    lines.style.display = 'none';
-    empty.style.display = 'block';
-    return;
-  }
-
-  const nights = Math.round((new Date(checkout) - new Date(checkin)) / 86400000);
-  empty.style.display = 'none';
-
-  if (property.nightly_rate > 0) {
-    const total = property.nightly_rate * nights;
-    document.getElementById('sl-nights').textContent = `${nights} night${nights>1?'s':''} × ${fmtCurrency(property.nightly_rate)}`;
-    document.getElementById('sl-rate').textContent = '';
-    document.getElementById('sl-total').textContent = fmtCurrency(total);
-    lines.style.display = 'flex';
-  } else {
-    document.getElementById('sl-nights').textContent = `${nights} night${nights>1?'s':''}`;
-    document.getElementById('sl-rate').textContent = '';
-    document.getElementById('sl-total').textContent = 'Contact for pricing';
-    lines.style.display = 'flex';
-  }
-}
-
-async function submitBooking() {
-  const btn = document.getElementById('submit-btn');
-  const errEl = document.getElementById('form-error');
-  errEl.className = 'error-msg';
-
-  const name = document.getElementById('g-name').value.trim();
-  const email = document.getElementById('g-email').value.trim();
-  const phone = document.getElementById('g-phone').value.trim();
-  const message = document.getElementById('g-message').value.trim();
-  const checkin = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-  const guests = document.getElementById('guests').value;
-
-  if (!name || !email) {
-    errEl.textContent = 'Please fill in your name and email address.';
-    errEl.className = 'error-msg show'; return;
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errEl.textContent = 'Please enter a valid email address.';
-    errEl.className = 'error-msg show'; return;
-  }
-
-  btn.disabled = true; btn.textContent = 'Sending…';
-  document.getElementById('step3').className = 'step done';
-
-  try {
-    const res = await fetch('/api/book', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, guests, checkin, checkout, message })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Booking failed');
-
-    // Show success
-    document.querySelector('.page').style.display = 'none';
-    document.getElementById('success-screen').style.display = 'block';
-    document.getElementById('conf-email').textContent = email;
-    document.getElementById('conf-ref').textContent = 'Reference: ' + data.booking.uid;
-  } catch(e) {
-    errEl.textContent = e.message || 'Something went wrong. Please try again.';
-    errEl.className = 'error-msg show';
-    btn.disabled = false; btn.textContent = 'Request Booking';
-  }
-}
-
-init();
-</script>
+<script src="/js/shared.js"></script>
+<script src="/js/booking.js"></script>
 </body>
 </html>

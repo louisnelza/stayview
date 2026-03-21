@@ -250,7 +250,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Booking engine: public page ──────────────────────────────
-  if (pathname === "/book") {
+  if (pathname === "/book" || pathname === "/book.html") {
     const bookExternal = path.join(
       process.pkg ? path.dirname(process.execPath) : __dirname,
       "book.html"
@@ -359,6 +359,24 @@ const server = http.createServer(async (req, res) => {
     console.log(`  [direct booking] Deleted: ${deleted.name} — ${deleted.checkin} to ${deleted.checkout}`);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, deleted }));
+    return;
+  }
+
+  // ── Static files: /js/ and /css/ ─────────────────────────────
+  if (pathname.startsWith('/js/') || pathname.startsWith('/css/')) {
+    const ext      = pathname.split('.').pop();
+    const mimeMap  = { js: 'application/javascript', css: 'text/css' };
+    const mimeType = mimeMap[ext] || 'text/plain';
+    const filePath = path.join(
+      process.pkg ? path.dirname(process.execPath) : __dirname,
+      pathname
+    );
+    if (fs.existsSync(filePath)) {
+      res.writeHead(200, { 'Content-Type': mimeType, 'Cache-Control': 'no-store' });
+      res.end(fs.readFileSync(filePath));
+    } else {
+      res.writeHead(404); res.end('Static file not found: ' + pathname);
+    }
     return;
   }
 
