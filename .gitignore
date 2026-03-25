@@ -11,3 +11,10 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Build output
+dist/
+
+# Generated files
+package-lock.json
+bookings.json
