@@ -1,5 +1,8 @@
-# Environment variables — never commit this, it contains your private iCal tokens
+# Environment variables — never commit these, they contain private iCal tokens
+# .env        → developers, Raspberry Pi, and cloud deployments (Render/Railway)
+# config.txt  → non-technical users running the Windows/Mac/Linux executable
 .env
+config.txt
 
 # Node
 node_modules/
@@ -8,3 +11,10 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Build output
+dist/
+
+# Generated files
+package-lock.json
+bookings.json
