@@ -2,11 +2,17 @@
 // Dashboard logic for index.html.
 // Depends on: js/shared.js (loaded first via <script> tag)
 
-let allBookings  = [];
+let allBookings   = [];
 let currentFilter = 'all';
 let currentView   = 'upcoming';
 let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth();
+
+// ── Auto-refresh ──────────────────────────────────────────────
+let pollInterval    = null;   // setInterval handle
+let pollMs          = 0;      // 0 = disabled
+let lastLoadedAt    = null;   // Date of last successful fetch
+let stalenessTimer  = null;   // setInterval for "X min ago" display
 
 // ── Data loading ──────────────────────────────────────────────
 
@@ -84,9 +90,9 @@ async function loadAll() {
       document.getElementById('error-area').innerHTML =
         `<div class="error-box">⚠️ Some calendars had issues:<br><br>${warnings.join('<br>')}</div>`;
     }
-    document.getElementById('last-updated').textContent =
-      'Updated ' + new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
-
+    lastLoadedAt = new Date();
+    updateLastUpdatedLabel();
+    startStalenessTimer();
     updateStats();
     renderBookings();
     renderCalendar();
@@ -333,6 +339,7 @@ function setMode(mode) {
       tag.textContent = '⬡ Demo mode';
       document.querySelector('.logo').appendChild(tag);
     }
+    stopPolling();
     allBookings = makeDemoBookings();
     document.getElementById('error-area').innerHTML = '';
     document.getElementById('last-updated').textContent = 'Demo data';
@@ -345,11 +352,59 @@ function setMode(mode) {
   }
 }
 
+// ── Auto-refresh & staleness ─────────────────────────────────
+
+function updateLastUpdatedLabel() {
+  if (!lastLoadedAt) return;
+  const el = document.getElementById('last-updated');
+  const mins = Math.floor((Date.now() - lastLoadedAt) / 60000);
+  if (mins < 1)       el.textContent = 'Updated just now';
+  else if (mins < 60) el.textContent = `Updated ${mins} min${mins > 1 ? 's' : ''} ago`;
+  else {
+    const hrs = Math.floor(mins / 60);
+    el.textContent = `Updated ${hrs} hr${hrs > 1 ? 's' : ''} ago`;
+  }
+  // Pulse the label amber when stale (older than half the poll interval)
+  const staleThresholdMs = pollMs > 0 ? pollMs / 2 : 30 * 60 * 1000;
+  const isStale = (Date.now() - lastLoadedAt) > staleThresholdMs;
+  el.classList.toggle('stale', isStale);
+}
+
+function startStalenessTimer() {
+  if (stalenessTimer) clearInterval(stalenessTimer);
+  stalenessTimer = setInterval(updateLastUpdatedLabel, 30000); // update label every 30s
+}
+
+function startPolling(intervalMs) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollMs = intervalMs;
+  if (intervalMs <= 0) return;
+  pollInterval = setInterval(() => {
+    if (currentMode === 'live') {
+      console.log('[StayView] Auto-refresh triggered');
+      loadAll();
+    }
+  }, intervalMs);
+  console.log(`[StayView] Auto-refresh enabled every ${Math.round(intervalMs / 60000)} minutes`);
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  if (stalenessTimer) { clearInterval(stalenessTimer); stalenessTimer = null; }
+}
+
 // ── Init ──────────────────────────────────────────────────────
 
 renderCalendar();
 
 fetch('/config')
   .then(r => r.json())
-  .then(cfg => { if (cfg.hasLiveData) setMode('live'); })
+  .then(cfg => {
+    if (cfg.hasLiveData) setMode('live');
+    else setMode('demo');
+    // Start auto-refresh if configured (only in live mode)
+    if (cfg.pollIntervalMs > 0 && cfg.hasLiveData) {
+      startPolling(cfg.pollIntervalMs);
+    }
+  })
   .catch(() => setMode('demo'));

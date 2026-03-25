@@ -38,7 +38,19 @@ header {
 .logo { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--accent); }
 .logo span { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 300; color: var(--text3); margin-left: 10px; }
 .header-right { display: flex; align-items: center; gap: 12px; }
-#last-updated { font-size: 12px; color: var(--text3); }
+#last-updated {
+  font-size: 12px;
+  color: var(--text3);
+  transition: color 0.4s;
+}
+#last-updated.stale {
+  color: var(--accent);
+  animation: pulse-stale 2.5s ease-in-out infinite;
+}
+@keyframes pulse-stale {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
 
 .refresh-btn { background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
 .refresh-btn:hover { background: var(--bg4); color: var(--text); }
