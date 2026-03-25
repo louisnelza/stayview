@@ -262,26 +262,30 @@ function makeDemoBookings() {
   const base = today();
   const d = offset => { const x = new Date(base); x.setDate(x.getDate() + offset); return x; };
   let uid = 1;
-  const b = (source, name, startOff, nights, isBlocked = false) => ({
+  const b = (source, name, startOff, nights, isBlocked = false, details = null) => ({
     uid: 'demo-' + uid++, source, summary: name,
     start: d(startOff), end: d(startOff + nights),
-    nights, isBlocked,
+    nights, isBlocked, details,
+  });
+  const ls = (ref, name, email, cell) => ({
+    reference: ref, name, email, cell,
+    viewUrl: `https://www.lekkeslaap.co.za/suppliers/bookings/quotation/${ref}`,
   });
   return [
-    b('airbnb',      'Airbnb Guest',        -2, 4),
-    b('lekkeslaap',  'Pieter van Wyk',        3, 3),
-    b('booking',     'Booking.com Guest',     5, 2),
-    b('airbnb',      'Airbnb Guest',          9, 5),
-    b('lekkeslaap',  'Anri Botha',           12, 7),
-    b('booking',     'Booking.com Guest',    14, 3),
-    b('airbnb',      'Airbnb Guest',         20, 4),
-    b('lekkeslaap',  'Kobus Joubert',        24, 2),
-    b('booking',     'Booking.com Guest',    27, 6),
-    b('airbnb',      'Airbnb Guest',         33, 3),
-    b('lekkeslaap',  'Sarel du Plessis',     38, 5),
-    b('booking',     'Booking.com Guest',    44, 4),
-    b('airbnb',      'Airbnb Guest',         50, 3),
-    b('lekkeslaap',  'Mia Pretorius',        55, 6),
+    b('airbnb',      'Airbnb Guest',                    -2, 4),
+    b('lekkeslaap',  'Pieter van Wyk',                   3, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',    'pieter@example.co.za', '+27821234567')),
+    b('booking',     'Booking.com Guest',                5, 2),
+    b('airbnb',      'Airbnb Guest',                     9, 5),
+    b('lekkeslaap',  'Anri Botha',                      12, 7, false, ls('LS-DEMO02', 'Anri Botha',        'anri@example.co.za',   '+27839876543')),
+    b('booking',     'Booking.com Guest',               14, 3),
+    b('airbnb',      'Airbnb Guest',                    20, 4),
+    b('lekkeslaap',  'Kobus Joubert',                   24, 2, false, ls('LS-DEMO03', 'Kobus Joubert',     'kobus@example.co.za',  '+27711112222')),
+    b('booking',     'Booking.com Guest',               27, 6),
+    b('airbnb',      'Airbnb Guest',                    33, 3),
+    b('lekkeslaap',  'Sarel du Plessis',                38, 5, false, ls('LS-DEMO04', 'Sarel du Plessis',  'sarel@example.co.za',  '+27723334444')),
+    b('booking',     'Booking.com Guest',               44, 4),
+    b('airbnb',      'Airbnb Guest',                    50, 3),
+    b('lekkeslaap',  'Mia Pretorius',                   55, 6, false, ls('LS-DEMO05', 'Mia Pretorius',     'mia@example.co.za',    '+27845556666')),
     b('airbnb',      null,  6, 2, true),
     b('lekkeslaap',  null, 18, 1, true),
   ].sort((a, b) => a.start - b.start);
