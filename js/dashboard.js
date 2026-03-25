@@ -62,27 +62,12 @@ async function loadAll() {
     }
     try { localStorage.setItem('stayview_counts', JSON.stringify(updatedCounts)); } catch(e) {}
 
-    // Load direct bookings from server
-    try {
-      const directRes  = await fetch('/api/bookings');
-      const directData = await directRes.json();
-      directData.forEach(b => {
-        allBookings.push({
-          uid:       b.uid,
-          source:    'direct',
-          summary:   b.name,
-          start:     new Date(b.checkin  + 'T00:00:00'),
-          end:       new Date(b.checkout + 'T00:00:00'),
-          nights:    b.nights,
-          isBlocked: false,
-          status:    b.status,
-          email:     b.email,
-          phone:     b.phone,
-        });
-      });
-    } catch(e) {
-      console.warn('Could not load direct bookings:', e);
-    }
+    // Direct bookings fetch — enabled when booking engine is released
+    // try {
+    //   const directRes  = await fetch('/api/bookings');
+    //   const directData = await directRes.json();
+    //   directData.forEach(b => { allBookings.push({ ...b }); });
+    // } catch(e) { console.warn('Could not load direct bookings:', e); }
 
     allBookings.sort((a, b) => a.start - b.start);
 
@@ -177,7 +162,7 @@ function renderBookings() {
 
   for (const b of filtered) {
     const status   = getStatus(b);
-    const isDirect = b.source === 'direct';
+    const isDirect = false; // b.source === 'direct' — enabled when booking engine is released
 
     if (currentView === 'upcoming' && status !== lastStatus) {
       if (status === 'active')   html += '<div class="section-label">Currently Active</div>';
@@ -254,42 +239,11 @@ function changeMonth(dir) {
   renderCalendar();
 }
 
-// ── Delete booking ────────────────────────────────────────────
-
-let pendingDeleteUid = null;
-
-function openDeleteModal(uid, name, checkin, checkout) {
-  pendingDeleteUid = uid;
-  document.getElementById('delete-modal-body').innerHTML =
-    `Are you sure you want to delete the direct booking for <strong>${name}</strong> (${checkin} → ${checkout})?<br><br>This cannot be undone.`;
-  document.getElementById('delete-modal').style.display = 'flex';
-}
-
-function closeDeleteModal() {
-  document.getElementById('delete-modal').style.display = 'none';
-  pendingDeleteUid = null;
-}
-
-async function confirmDelete() {
-  if (!pendingDeleteUid) return;
-  const btn = document.getElementById('delete-confirm-btn');
-  btn.textContent = 'Deleting…';
-  btn.disabled = true;
-  try {
-    const res  = await fetch('/api/bookings/' + encodeURIComponent(pendingDeleteUid), { method: 'DELETE' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Delete failed');
-    closeDeleteModal();
-    allBookings = allBookings.filter(b => b.uid !== pendingDeleteUid);
-    updateStats();
-    renderBookings();
-    renderCalendar();
-  } catch(e) {
-    alert('Could not delete booking: ' + e.message);
-  }
-  btn.textContent = 'Delete';
-  btn.disabled = false;
-}
+// ── Delete booking — enabled when booking engine is released ──
+// let pendingDeleteUid = null;
+// function openDeleteModal(uid, name, checkin, checkout) { ... }
+// function closeDeleteModal() { ... }
+// async function confirmDelete() { ... }
 
 // ── Demo mode ─────────────────────────────────────────────────
 
@@ -309,10 +263,8 @@ function makeDemoBookings() {
     b('airbnb',      'Airbnb Guest',          9, 5),
     b('lekkeslaap',  'Anri Botha',           12, 7),
     b('booking',     'Booking.com Guest',    14, 3),
-    b('direct',      'Sarah Johnson',        17, 4),
     b('airbnb',      'Airbnb Guest',         20, 4),
     b('lekkeslaap',  'Kobus Joubert',        24, 2),
-    b('direct',      'Mark van der Berg',    27, 3),
     b('booking',     'Booking.com Guest',    27, 6),
     b('airbnb',      'Airbnb Guest',         33, 3),
     b('lekkeslaap',  'Sarel du Plessis',     38, 5),

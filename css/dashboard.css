@@ -103,11 +103,9 @@ main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
 .nights-num { font-size: 22px; font-weight: 600; text-align: right; line-height: 1; }
 .nights-lbl { font-size: 11px; color: var(--text3); text-align: right; }
 
-/* ── Delete button ────────────────────────────────────────────*/
+/* ── Delete button & modal — enabled when booking engine is released
 .delete-btn { background: transparent; border: none; color: var(--text3); cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: 13px; transition: all 0.15s; line-height: 1; }
 .delete-btn:hover { background: rgba(163,48,48,0.12); color: #e8837a; }
-
-/* ── Delete modal ─────────────────────────────────────────────*/
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.15s ease; }
 .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--r); padding: 24px; max-width: 360px; width: 90%; }
 .modal-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
@@ -117,6 +115,7 @@ main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
 .modal-cancel:hover { background: var(--bg4); color: var(--text); }
 .modal-delete { background: rgba(163,48,48,0.85); border: none; color: white; padding: 7px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: inherit; }
 .modal-delete:hover { background: rgba(163,48,48,1); }
+──────────────────────────────────────────────────────────────── */
 
 /* ── Calendar ─────────────────────────────────────────────────*/
 .cal-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; }
@@ -160,10 +159,11 @@ main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
   header { padding: 14px 16px; }
 }
 
-/* ── Book Direct button ───────────────────────────────────────*/
+/* ── Book Direct button — enabled when booking engine is released
 .book-direct-btn {
   background: var(--accent); color: #1a1a16; padding: 6px 14px;
   border-radius: 6px; font-size: 13px; font-family: inherit;
   text-decoration: none; font-weight: 500; transition: opacity 0.15s;
 }
 .book-direct-btn:hover { opacity: 0.85; }
+────────────────────────────────────────────────────────────── */
