@@ -18,7 +18,7 @@
       <button class="mode-btn" id="btn-live" onclick="setMode('live')">Live</button>
       <button class="mode-btn active" id="btn-demo" onclick="setMode('demo')">Demo</button>
     </div>
-    <a href="/book" target="_blank" class="book-direct-btn">Book Direct ↗</a>
+    <!-- Book Direct button — enabled when booking engine is released -->
     <button class="refresh-btn" id="refresh-btn" onclick="loadAll()">↻ Refresh</button>
   </div>
 </header>
@@ -43,7 +43,7 @@
             <button class="filter-btn f-airbnb"     onclick="setFilter('airbnb',this)">Airbnb</button>
             <button class="filter-btn f-booking"    onclick="setFilter('booking',this)">Booking.com</button>
             <button class="filter-btn f-lekkeslaap" onclick="setFilter('lekkeslaap',this)">Lekkeslaap</button>
-            <button class="filter-btn f-direct"     onclick="setFilter('direct',this)">Direct</button>
+            <!-- Direct filter — enabled when booking engine is released -->
           </div>
           <div class="filter-group view-group">
             <button class="filter-btn active" onclick="setView('upcoming',this)">Upcoming</button>
@@ -77,7 +77,7 @@
           <div class="legend-item"><div class="legend-dot" style="background:var(--airbnb)"></div>Airbnb</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--booking)"></div>Booking.com</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--lekkeslaap)"></div>Lekkeslaap</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--direct)"></div>Direct</div>
+          <!-- Direct legend — enabled when booking engine is released -->
           <div class="legend-item"><div class="legend-dot" style="background:var(--text3)"></div>Blocked</div>
         </div>
       </div>
@@ -85,6 +85,7 @@
   </div>
 </main>
 
+<!-- Delete modal — enabled when booking engine is released
 <div class="modal-overlay" id="delete-modal" style="display:none" onclick="if(event.target===this)closeDeleteModal()">
   <div class="modal">
     <div class="modal-title">Delete booking?</div>
@@ -95,6 +96,7 @@
     </div>
   </div>
 </div>
+-->
 
 <script src="/js/shared.js"></script>
 <script src="/js/dashboard.js"></script>

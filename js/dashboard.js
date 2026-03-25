@@ -2,11 +2,17 @@
 // Dashboard logic for index.html.
 // Depends on: js/shared.js (loaded first via <script> tag)
 
-let allBookings  = [];
+let allBookings   = [];
 let currentFilter = 'all';
 let currentView   = 'upcoming';
 let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth();
+
+// ── Auto-refresh ──────────────────────────────────────────────
+let pollInterval    = null;   // setInterval handle
+let pollMs          = 0;      // 0 = disabled
+let lastLoadedAt    = null;   // Date of last successful fetch
+let stalenessTimer  = null;   // setInterval for "X min ago" display
 
 // ── Data loading ──────────────────────────────────────────────
 
@@ -56,27 +62,12 @@ async function loadAll() {
     }
     try { localStorage.setItem('stayview_counts', JSON.stringify(updatedCounts)); } catch(e) {}
 
-    // Load direct bookings from server
-    try {
-      const directRes  = await fetch('/api/bookings');
-      const directData = await directRes.json();
-      directData.forEach(b => {
-        allBookings.push({
-          uid:       b.uid,
-          source:    'direct',
-          summary:   b.name,
-          start:     new Date(b.checkin  + 'T00:00:00'),
-          end:       new Date(b.checkout + 'T00:00:00'),
-          nights:    b.nights,
-          isBlocked: false,
-          status:    b.status,
-          email:     b.email,
-          phone:     b.phone,
-        });
-      });
-    } catch(e) {
-      console.warn('Could not load direct bookings:', e);
-    }
+    // Direct bookings fetch — enabled when booking engine is released
+    // try {
+    //   const directRes  = await fetch('/api/bookings');
+    //   const directData = await directRes.json();
+    //   directData.forEach(b => { allBookings.push({ ...b }); });
+    // } catch(e) { console.warn('Could not load direct bookings:', e); }
 
     allBookings.sort((a, b) => a.start - b.start);
 
@@ -84,9 +75,9 @@ async function loadAll() {
       document.getElementById('error-area').innerHTML =
         `<div class="error-box">⚠️ Some calendars had issues:<br><br>${warnings.join('<br>')}</div>`;
     }
-    document.getElementById('last-updated').textContent =
-      'Updated ' + new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
-
+    lastLoadedAt = new Date();
+    updateLastUpdatedLabel();
+    startStalenessTimer();
     updateStats();
     renderBookings();
     renderCalendar();
@@ -171,7 +162,7 @@ function renderBookings() {
 
   for (const b of filtered) {
     const status   = getStatus(b);
-    const isDirect = b.source === 'direct';
+    const isDirect = false; // b.source === 'direct' — enabled when booking engine is released
 
     if (currentView === 'upcoming' && status !== lastStatus) {
       if (status === 'active')   html += '<div class="section-label">Currently Active</div>';
@@ -248,42 +239,11 @@ function changeMonth(dir) {
   renderCalendar();
 }
 
-// ── Delete booking ────────────────────────────────────────────
-
-let pendingDeleteUid = null;
-
-function openDeleteModal(uid, name, checkin, checkout) {
-  pendingDeleteUid = uid;
-  document.getElementById('delete-modal-body').innerHTML =
-    `Are you sure you want to delete the direct booking for <strong>${name}</strong> (${checkin} → ${checkout})?<br><br>This cannot be undone.`;
-  document.getElementById('delete-modal').style.display = 'flex';
-}
-
-function closeDeleteModal() {
-  document.getElementById('delete-modal').style.display = 'none';
-  pendingDeleteUid = null;
-}
-
-async function confirmDelete() {
-  if (!pendingDeleteUid) return;
-  const btn = document.getElementById('delete-confirm-btn');
-  btn.textContent = 'Deleting…';
-  btn.disabled = true;
-  try {
-    const res  = await fetch('/api/bookings/' + encodeURIComponent(pendingDeleteUid), { method: 'DELETE' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Delete failed');
-    closeDeleteModal();
-    allBookings = allBookings.filter(b => b.uid !== pendingDeleteUid);
-    updateStats();
-    renderBookings();
-    renderCalendar();
-  } catch(e) {
-    alert('Could not delete booking: ' + e.message);
-  }
-  btn.textContent = 'Delete';
-  btn.disabled = false;
-}
+// ── Delete booking — enabled when booking engine is released ──
+// let pendingDeleteUid = null;
+// function openDeleteModal(uid, name, checkin, checkout) { ... }
+// function closeDeleteModal() { ... }
+// async function confirmDelete() { ... }
 
 // ── Demo mode ─────────────────────────────────────────────────
 
@@ -303,10 +263,8 @@ function makeDemoBookings() {
     b('airbnb',      'Airbnb Guest',          9, 5),
     b('lekkeslaap',  'Anri Botha',           12, 7),
     b('booking',     'Booking.com Guest',    14, 3),
-    b('direct',      'Sarah Johnson',        17, 4),
     b('airbnb',      'Airbnb Guest',         20, 4),
     b('lekkeslaap',  'Kobus Joubert',        24, 2),
-    b('direct',      'Mark van der Berg',    27, 3),
     b('booking',     'Booking.com Guest',    27, 6),
     b('airbnb',      'Airbnb Guest',         33, 3),
     b('lekkeslaap',  'Sarel du Plessis',     38, 5),
@@ -333,6 +291,7 @@ function setMode(mode) {
       tag.textContent = '⬡ Demo mode';
       document.querySelector('.logo').appendChild(tag);
     }
+    stopPolling();
     allBookings = makeDemoBookings();
     document.getElementById('error-area').innerHTML = '';
     document.getElementById('last-updated').textContent = 'Demo data';
@@ -345,11 +304,59 @@ function setMode(mode) {
   }
 }
 
+// ── Auto-refresh & staleness ─────────────────────────────────
+
+function updateLastUpdatedLabel() {
+  if (!lastLoadedAt) return;
+  const el = document.getElementById('last-updated');
+  const mins = Math.floor((Date.now() - lastLoadedAt) / 60000);
+  if (mins < 1)       el.textContent = 'Updated just now';
+  else if (mins < 60) el.textContent = `Updated ${mins} min${mins > 1 ? 's' : ''} ago`;
+  else {
+    const hrs = Math.floor(mins / 60);
+    el.textContent = `Updated ${hrs} hr${hrs > 1 ? 's' : ''} ago`;
+  }
+  // Pulse the label amber when stale (older than half the poll interval)
+  const staleThresholdMs = pollMs > 0 ? pollMs / 2 : 30 * 60 * 1000;
+  const isStale = (Date.now() - lastLoadedAt) > staleThresholdMs;
+  el.classList.toggle('stale', isStale);
+}
+
+function startStalenessTimer() {
+  if (stalenessTimer) clearInterval(stalenessTimer);
+  stalenessTimer = setInterval(updateLastUpdatedLabel, 30000); // update label every 30s
+}
+
+function startPolling(intervalMs) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollMs = intervalMs;
+  if (intervalMs <= 0) return;
+  pollInterval = setInterval(() => {
+    if (currentMode === 'live') {
+      console.log('[StayView] Auto-refresh triggered');
+      loadAll();
+    }
+  }, intervalMs);
+  console.log(`[StayView] Auto-refresh enabled every ${Math.round(intervalMs / 60000)} minutes`);
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  if (stalenessTimer) { clearInterval(stalenessTimer); stalenessTimer = null; }
+}
+
 // ── Init ──────────────────────────────────────────────────────
 
 renderCalendar();
 
 fetch('/config')
   .then(r => r.json())
-  .then(cfg => { if (cfg.hasLiveData) setMode('live'); })
+  .then(cfg => {
+    if (cfg.hasLiveData) setMode('live');
+    else setMode('demo');
+    // Start auto-refresh if configured (only in live mode)
+    if (cfg.pollIntervalMs > 0 && cfg.hasLiveData) {
+      startPolling(cfg.pollIntervalMs);
+    }
+  })
   .catch(() => setMode('demo'));

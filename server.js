@@ -183,10 +183,15 @@ const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
 
   if (pathname === "/config") {
+    loadConfig();
     const sources = getSources();
     const hasLiveData = Object.values(sources).some(Boolean);
+    // Parse poll interval from config — default 2 hours, 0 = disabled
+    const rawInterval = process.env.POLL_INTERVAL_MINUTES;
+    const pollMinutes = rawInterval !== undefined ? parseInt(rawInterval) : 120;
+    const pollIntervalMs = pollMinutes > 0 ? pollMinutes * 60 * 1000 : 0;
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ hasLiveData }));
+    res.end(JSON.stringify({ hasLiveData, pollIntervalMs }));
     return;
   }
 
