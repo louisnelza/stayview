@@ -3,7 +3,21 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
-// Support both config.txt (user-friendly) and .env (developer)
+// ── Config loading ───────────────────────────────────────────
+// Two config formats are supported intentionally:
+//
+//   .env         → developers, Raspberry Pi, Render/Railway
+//                  standard Node.js convention, supported natively
+//                  by all cloud platforms as environment variables
+//
+//   config.txt   → non-technical users running the packaged executable
+//                  (.exe / mac / linux binary built with pkg)
+//                  visible in File Explorer/Finder, editable in Notepad
+//                  NEVER committed to git (listed in .gitignore)
+//
+// Both use the same KEY=VALUE format. config.txt takes priority for
+// iCal URLs only if at least one URL is set — otherwise falls through
+// to .env so a blank config.txt doesn't override real credentials.
 function loadConfig() {
   const fs = require("fs");
   const path = require("path");
