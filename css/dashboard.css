@@ -167,3 +167,40 @@ main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
 }
 .book-direct-btn:hover { opacity: 0.85; }
 ────────────────────────────────────────────────────────────── */
+
+/* ── Lekkeslaap booking details ───────────────────────────────*/
+.booking-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+  align-items: center;
+}
+.booking-ref {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text3);
+  background: var(--bg3);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.booking-detail-link {
+  font-size: 11px;
+  color: var(--text2);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg3);
+  transition: all 0.15s;
+}
+.booking-detail-link:hover {
+  background: var(--bg4);
+  color: var(--text);
+}
+.booking-view-link {
+  color: var(--lekkeslaap);
+  background: rgba(244,121,32,0.08);
+}
+.booking-view-link:hover {
+  background: rgba(244,121,32,0.15);
+}

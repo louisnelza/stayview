@@ -175,6 +175,16 @@ function renderBookings() {
     const srcLabel = b.isBlocked ? 'Blocked' : (SOURCE_LABELS[b.source] || b.source);
     const statusLabel = status === 'active' ? 'Checked In' : status === 'upcoming' ? 'Upcoming' : 'Past';
 
+    // Extra details for Lekkeslaap bookings
+    const d = b.details;
+    const extraDetails = (d && !b.isBlocked) ? `
+      <div class="booking-extra">
+        ${d.reference ? `<span class="booking-ref">${escHtml(d.reference)}</span>` : ''}
+        ${d.email     ? `<a href="mailto:${escHtml(d.email)}" class="booking-detail-link">${escHtml(d.email)}</a>` : ''}
+        ${d.cell      ? `<a href="tel:${escHtml(d.cell)}" class="booking-detail-link">${escHtml(d.cell)}</a>` : ''}
+        ${d.viewUrl   ? `<a href="${escHtml(d.viewUrl)}" target="_blank" rel="noopener" class="booking-detail-link booking-view-link">View on Lekkeslaap ↗</a>` : ''}
+      </div>` : '';
+
     html += `
       <div class="booking-card src-${srcKey}">
         <div>
@@ -184,6 +194,7 @@ function renderBookings() {
             <span class="badge badge-${srcKey}">${srcLabel}</span>
             <span class="badge badge-${status}">${statusLabel}</span>
           </div>
+          ${extraDetails}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           <div style="text-align:right">

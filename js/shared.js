@@ -50,58 +50,89 @@ function getStatus(b) {
 
 // ── iCal parsing ──────────────────────────────────────────────
 
+// Unfold iCal line continuations (CRLF or LF followed by space/tab)
+function unfoldIcal(text) {
+  return text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
+}
+
+// Unescape iCal \n \, \; \\ sequences
 function unescapeIcal(s) {
   return s
-    .replace(/\\n/g, ' ')
+    .replace(/\\n/g, '\n')
     .replace(/\\,/g, ',')
     .replace(/\\;/g, ';')
     .replace(/\\\\/g, '\\')
     .trim();
 }
 
+// Parse all structured fields from a Lekkeslaap SUMMARY value
+// Format: "Reference: LS-XXXXX \nCustomer: Name \nEmail: x \nCell: y \nView at: url"
+function parseLekkeslaapSummary(rawSummary) {
+  const text = unescapeIcal(rawSummary);
+  const get = key => {
+    const m = text.match(new RegExp(key + ':\\s*(.+?)(?:\\n|$)', 'i'));
+    return m ? m[1].trim() : null;
+  };
+  return {
+    reference: get('Reference'),
+    name:      get('Customer'),
+    email:     get('Email'),
+    cell:      get('Cell'),
+    viewUrl:   get('View at'),
+  };
+}
+
 function extractGuestName(summary, description, source) {
-  // Lekkeslaap embeds "Customer: Name" in the summary/description
-  const customerMatch = (summary + ' ' + description).match(/Customer:\s*([^\\\n,]+)/i);
-  if (customerMatch) return customerMatch[1].trim();
-  // Booking.com anonymises all guests
+  if (source === 'lekkeslaap') {
+    const parsed = parseLekkeslaapSummary(summary);
+    if (parsed.name) return parsed.name;
+  }
   if (source === 'booking') return 'Booking.com Guest';
-  // Airbnb anonymises guests as "Reserved"
   if (source === 'airbnb' && /^reserved$/i.test(summary.trim())) return 'Airbnb Guest';
-  // General: strip confirmation codes in parentheses
-  return summary.split('(')[0].replace(/\\n.*/s, '').trim() || 'Guest';
+  return summary.split('(')[0].replace(/\n.*/s, '').trim() || 'Guest';
 }
 
 function parseIcal(text, source) {
   const bookings = [];
-  const events = text.split('BEGIN:VEVENT');
+  // Unfold wrapped lines before splitting into events
+  const unfolded = unfoldIcal(text);
+  const events = unfolded.split('BEGIN:VEVENT');
   events.shift();
+
   for (const ev of events) {
     const get = k => {
       const m = ev.match(new RegExp(k + '[^:]*:([^\r\n]+)'));
       return m ? m[1].trim() : '';
     };
-    const dtstart = get('DTSTART');
-    const dtend   = get('DTEND');
-    const uid     = get('UID');
-    const rawSummary  = unescapeIcal(get('SUMMARY') || 'Guest');
+    const dtstart     = get('DTSTART');
+    const dtend       = get('DTEND');
+    const uid         = get('UID');
+    const rawSummary  = get('SUMMARY') || '';
     const description = unescapeIcal(get('DESCRIPTION'));
+
     if (!dtstart || !dtend) continue;
     const start = parseDate(dtstart);
     const end   = parseDate(dtend);
     if (isNaN(start) || isNaN(end)) continue;
     const nights = nightsBetween(start, end);
-    // Booking.com: never blocked (uses "CLOSED - Not available" for real bookings too)
-    // Airbnb: "Airbnb (Not available)" = blocked, "Reserved" = real booking
-    // Others: standard blocked keywords
+
     const isBlocked = source === 'booking'
       ? false
       : source === 'airbnb'
         ? /not available/i.test(rawSummary)
-        : /block|not available|unavailable|closed/i.test(rawSummary);
+        : /block|not available|unavailable|closed|blocked dates/i.test(description + rawSummary);
+
+    // Parse all available fields for Lekkeslaap
+    let details = null;
+    if (source === 'lekkeslaap' && !isBlocked) {
+      details = parseLekkeslaapSummary(rawSummary);
+    }
+
     const summary = isBlocked
-      ? rawSummary
+      ? (rawSummary || description || 'Blocked')
       : extractGuestName(rawSummary, description, source);
-    bookings.push({ uid, source, summary, start, end, nights, isBlocked });
+
+    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details });
   }
   return bookings;
 }
