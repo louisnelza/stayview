@@ -73,6 +73,51 @@ function getSources() {
   };
 }
 
+// ── Server-side polling state ────────────────────────────────
+// The server polls iCal feeds independently of the browser tab.
+// This means data stays fresh even when no browser is open.
+let serverCachedResults = null;   // last successful fetch results
+let serverLastFetchedAt  = null;  // timestamp of last fetch
+let serverPollTimer      = null;  // setInterval handle
+
+async function serverFetchAll() {
+  const sources = getSources();
+  const entries = Object.entries(sources).filter(([, u]) => u);
+  if (entries.length === 0) return;
+  console.log('\n[server poll] Fetching calendars...');
+  try {
+    const results = await Promise.all(
+      entries.map(async ([name, srcUrl]) => {
+        try {
+          const text = await fetchUrl(srcUrl);
+          const hasCalendar = text.includes('BEGIN:VCALENDAR');
+          const hasEvents   = text.includes('BEGIN:VEVENT');
+          if (!hasCalendar) return { name, success: false, data: '', error: 'No VCALENDAR' };
+          console.log(`  [${name}] OK (${text.length} chars)`);
+          return { name, success: true, data: text, error: null, empty: !hasEvents };
+        } catch(e) {
+          console.log(`  [${name}] FAILED: ${e.message}`);
+          return { name, success: false, data: '', error: e.message };
+        }
+      })
+    );
+    serverCachedResults = results;
+    serverLastFetchedAt = new Date();
+    console.log(`[server poll] Done at ${serverLastFetchedAt.toLocaleTimeString()}`);
+  } catch(e) {
+    console.error('[server poll] Unexpected error:', e.message);
+  }
+}
+
+function startServerPolling(intervalMs) {
+  if (serverPollTimer) clearInterval(serverPollTimer);
+  if (intervalMs <= 0) return;
+  // Fetch immediately on start, then on interval
+  serverFetchAll();
+  serverPollTimer = setInterval(serverFetchAll, intervalMs);
+  console.log(`[server poll] Auto-refresh every ${Math.round(intervalMs / 60000)} minutes`);
+}
+
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   "Accept": "text/calendar, text/plain, */*",
@@ -204,13 +249,26 @@ const server = http.createServer(async (req, res) => {
     const rawInterval = process.env.POLL_INTERVAL_MINUTES;
     const pollMinutes = rawInterval !== undefined ? parseInt(rawInterval) : 120;
     const pollIntervalMs = pollMinutes > 0 ? pollMinutes * 60 * 1000 : 0;
+    // Start server-side polling if not already running
+    if (pollIntervalMs > 0 && hasLiveData && !serverPollTimer) {
+      startServerPolling(pollIntervalMs);
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ hasLiveData, pollIntervalMs }));
     return;
   }
 
   if (pathname === "/calendars") {
-    console.log("\nFetching calendars...");
+    const url = new URL(req.url, "http://localhost");
+    const forceRefresh = url.searchParams.get("force") === "1";
+    // Serve cached results if available and not forced
+    if (serverCachedResults && !forceRefresh) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(serverCachedResults));
+      return;
+    }
+    // No cache yet — fetch immediately (first load or force refresh)
+    console.log("\nFetching calendars (on-demand)...");
     const sources = getSources();
     try {
       const results = await Promise.all(
@@ -235,12 +293,21 @@ const server = http.createServer(async (req, res) => {
           }
         })
       );
+      serverCachedResults = results;
+      serverLastFetchedAt = new Date();
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(results));
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: e.message }));
     }
+    return;
+  }
+
+  // ── Last updated timestamp ────────────────────────────────────
+  if (pathname === "/last-updated") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ lastFetchedAt: serverLastFetchedAt }));
     return;
   }
 
