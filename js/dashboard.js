@@ -16,7 +16,7 @@ let stalenessTimer  = null;   // setInterval for "X min ago" display
 
 // ── Data loading ──────────────────────────────────────────────
 
-async function loadAll() {
+async function loadAll(force = false) {
   const btn = document.getElementById('refresh-btn');
   btn.disabled = true;
   btn.textContent = 'Loading…';
@@ -25,7 +25,8 @@ async function loadAll() {
   document.getElementById('error-area').innerHTML = '';
 
   try {
-    const res = await fetch(`${window.location.origin}/calendars`);
+    const url = force ? '/calendars?force=1' : '/calendars';
+    const res = await fetch(`${window.location.origin}${url}`);
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const results = await res.json();
     allBookings = [];
@@ -76,6 +77,12 @@ async function loadAll() {
         `<div class="error-box">⚠️ Some calendars had issues:<br><br>${warnings.join('<br>')}</div>`;
     }
     lastLoadedAt = new Date();
+    // Sync with server's actual fetch time if available
+    try {
+      const tsRes = await fetch('/last-updated');
+      const tsData = await tsRes.json();
+      if (tsData.lastFetchedAt) lastLoadedAt = new Date(tsData.lastFetchedAt);
+    } catch(e) {}
     updateLastUpdatedLabel();
     startStalenessTimer();
     updateStats();
@@ -375,3 +382,18 @@ fetch('/config')
     }
   })
   .catch(() => setMode('demo'));
+
+// ── Page Visibility — catch up when tab becomes active again ──
+// Browsers throttle or pause setInterval in background tabs.
+// When the user returns, check if data is stale and refresh immediately.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (currentMode !== 'live') return;
+  if (!lastLoadedAt) return;
+  const staleThresholdMs = pollMs > 0 ? pollMs : 2 * 60 * 60 * 1000;
+  const ageMs = Date.now() - lastLoadedAt;
+  if (ageMs >= staleThresholdMs) {
+    console.log(`[StayView] Tab resumed — data is ${Math.round(ageMs / 60000)} mins old, refreshing now`);
+    loadAll();
+  }
+});
