@@ -97,9 +97,11 @@ main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
 .guest-name { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
 .booking-dates { font-size: 13px; color: var(--text2); margin-bottom: 6px; }
 .badge-row { display: flex; gap: 6px; }
-.badge-active   { background: rgba(106,184,106,0.15); color: var(--green); }
-.badge-upcoming { background: rgba(200,169,110,0.12); color: var(--accent); }
-.badge-past     { background: rgba(255,255,255,0.04); color: var(--text3); }
+.badge-active        { background: rgba(106,184,106,0.15);  color: var(--green); }
+.badge-checking-in   { background: rgba(91,163,214,0.15);   color: var(--blue); }
+.badge-checking-out  { background: rgba(200,169,110,0.15);  color: var(--accent); }
+.badge-upcoming      { background: rgba(200,169,110,0.12);  color: var(--accent); }
+.badge-past          { background: rgba(255,255,255,0.04);  color: var(--text3); }
 .nights-num { font-size: 22px; font-weight: 600; text-align: right; line-height: 1; }
 .nights-lbl { font-size: 11px; color: var(--text3); text-align: right; }
 

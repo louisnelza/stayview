@@ -43,9 +43,14 @@ function nightsBetween(start, end) {
 
 function getStatus(b) {
   const now = today();
-  if (b.start <= now && b.end > now) return 'active';
   if (b.start > now) return 'upcoming';
-  return 'past';
+  if (b.end <= now)  return 'past';
+  // Guest is currently in-stay — determine which day
+  const checkoutDay = new Date(b.end);
+  checkoutDay.setHours(0, 0, 0, 0);
+  if (now.getTime() === b.start.getTime())    return 'checking-in';
+  if (now.getTime() === checkoutDay.getTime()) return 'checking-out';
+  return 'active';
 }
 
 // ── iCal parsing ──────────────────────────────────────────────
