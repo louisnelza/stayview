@@ -110,7 +110,7 @@ function updateStats() {
   in30.setDate(in30.getDate() + 30);
 
   const real    = allBookings.filter(b => !b.isBlocked);
-  const active  = real.filter(b => getStatus(b) === 'active').length;
+  const active  = real.filter(b => ['checking-in', 'active', 'checking-out'].includes(getStatus(b))).length;
   const up30    = real.filter(b => b.start >= now && b.start < in30).length;
 
   let bookedNights = 0;
@@ -172,15 +172,23 @@ function renderBookings() {
     const isDirect = false; // b.source === 'direct' — enabled when booking engine is released
 
     if (currentView === 'upcoming' && status !== lastStatus) {
-      if (status === 'active')   html += '<div class="section-label">Currently Active</div>';
-      if (status === 'upcoming') html += '<div class="section-label">Upcoming</div>';
+      if (status === 'checking-in')  html += '<div class="section-label">Checking In Today</div>';
+      if (status === 'checking-out') html += '<div class="section-label">Checking Out Today</div>';
+      if (status === 'active')       html += '<div class="section-label">Currently Staying</div>';
+      if (status === 'upcoming')     html += '<div class="section-label">Upcoming</div>';
       lastStatus = status;
     }
 
     const name     = b.isBlocked ? (b.summary || 'Blocked') : b.summary.split('(')[0].trim();
     const srcKey   = b.isBlocked ? 'blocked' : b.source;
     const srcLabel = b.isBlocked ? 'Blocked' : (SOURCE_LABELS[b.source] || b.source);
-    const statusLabel = status === 'active' ? 'Checked In' : status === 'upcoming' ? 'Upcoming' : 'Past';
+    const statusLabel = {
+      'checking-in':  'Checking In',
+      'active':       'Checked In',
+      'checking-out': 'Checking Out',
+      'upcoming':     'Upcoming',
+      'past':         'Past',
+    }[status] || status;
 
     // Extra details for Lekkeslaap bookings
     const d = b.details;
@@ -279,11 +287,12 @@ function makeDemoBookings() {
     viewUrl: `https://www.lekkeslaap.co.za/suppliers/bookings/quotation/${ref}`,
   });
   return [
-    b('airbnb',      'Airbnb Guest',                    -2, 4),
-    b('lekkeslaap',  'Pieter van Wyk',                   3, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',    'pieter@example.co.za', '+27821234567')),
-    b('booking',     'Booking.com Guest',                5, 2),
-    b('airbnb',      'Airbnb Guest',                     9, 5),
-    b('lekkeslaap',  'Anri Botha',                      12, 7, false, ls('LS-DEMO02', 'Anri Botha',        'anri@example.co.za',   '+27839876543')),
+    b('lekkeslaap',  'Mia Pretorius',                   -3, 4, false, ls('LS-DEMO05', 'Mia Pretorius',     'mia@example.co.za',    '+27845556666')), // checking out today (day 4 of 4)
+    b('airbnb',      'Airbnb Guest',                    -2, 5),        // checked in (mid-stay)
+    b('lekkeslaap',  'Pieter van Wyk',                   0, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',    'pieter@example.co.za', '+27821234567')), // checking in today
+    b('booking',     'Booking.com Guest',                2, 2),
+    b('airbnb',      'Airbnb Guest',                     5, 5),
+    b('lekkeslaap',  'Anri Botha',                       9, 7, false, ls('LS-DEMO02', 'Anri Botha',        'anri@example.co.za',   '+27839876543')),
     b('booking',     'Booking.com Guest',               14, 3),
     b('airbnb',      'Airbnb Guest',                    20, 4),
     b('lekkeslaap',  'Kobus Joubert',                   24, 2, false, ls('LS-DEMO03', 'Kobus Joubert',     'kobus@example.co.za',  '+27711112222')),
@@ -292,7 +301,6 @@ function makeDemoBookings() {
     b('lekkeslaap',  'Sarel du Plessis',                38, 5, false, ls('LS-DEMO04', 'Sarel du Plessis',  'sarel@example.co.za',  '+27723334444')),
     b('booking',     'Booking.com Guest',               44, 4),
     b('airbnb',      'Airbnb Guest',                    50, 3),
-    b('lekkeslaap',  'Mia Pretorius',                   55, 6, false, ls('LS-DEMO05', 'Mia Pretorius',     'mia@example.co.za',    '+27845556666')),
     b('airbnb',      null,  6, 2, true),
     b('lekkeslaap',  null, 18, 1, true),
   ].sort((a, b) => a.start - b.start);
