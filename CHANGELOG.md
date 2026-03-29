@@ -18,7 +18,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.1.0] — 2026 (Unreleased — main branch)
+## [1.1.0] — 2026-03-29
 
 ### Added
 - **Auto-refresh** — server-side polling re-fetches all iCal feeds on a configurable interval (`POLL_INTERVAL_MINUTES`, default 120). Polling runs on the server independently of any open browser tab (#1)
