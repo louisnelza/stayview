@@ -97,7 +97,7 @@ function extractGuestName(summary, description, source) {
   return summary.split('(')[0].replace(/\n.*/s, '').trim() || 'Guest';
 }
 
-function parseIcal(text, source) {
+function parseIcal(text, source, propertyId = 1) {
   const bookings = [];
   // Unfold wrapped lines before splitting into events
   const unfolded = unfoldIcal(text);
@@ -137,7 +137,7 @@ function parseIcal(text, source) {
       ? (rawSummary || description || 'Blocked')
       : extractGuestName(rawSummary, description, source);
 
-    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details });
+    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details, propertyId });
   }
   return bookings;
 }

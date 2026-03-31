@@ -41,7 +41,11 @@ function loadConfig() {
       });
     // Only use config.txt for iCal if at least one URL is actually set
     // Otherwise fall through to .env so a blank config.txt doesn't override real credentials
-    const hasIcalInConfig = !!(configVars.ICAL_AIRBNB || configVars.ICAL_BOOKING || configVars.ICAL_LEKKESLAAP);
+    // Check for either legacy iCal keys or new multi-property keys
+    const hasIcalInConfig = !!(
+      configVars.ICAL_AIRBNB || configVars.ICAL_BOOKING || configVars.ICAL_LEKKESLAAP ||
+      Object.keys(configVars).some(k => k.match(/^PROPERTY_\d+_(AIRBNB|BOOKING|LEKKESLAAP)$/))
+    );
     if (hasIcalInConfig) {
       Object.assign(process.env, configVars);
       return;
@@ -64,13 +68,64 @@ function loadConfig() {
   }
 }
 
-function getSources() {
+// Returns array of property objects from config.
+// Supports both legacy single-property format (ICAL_AIRBNB etc.)
+// and new multi-property format (PROPERTY_1_NAME, PROPERTY_1_AIRBNB etc.)
+function getProperties() {
   loadConfig();
-  return {
-    airbnb:     process.env.ICAL_AIRBNB     || null,
-    booking:    process.env.ICAL_BOOKING    || null,
-    lekkeslaap: process.env.ICAL_LEKKESLAAP || null,
-  };
+  const properties = [];
+
+  // Detect numbered properties: PROPERTY_1_NAME, PROPERTY_2_NAME ...
+  let i = 1;
+  while (true) {
+    const prefix = `PROPERTY_${i}_`;
+    const name   = process.env[`${prefix}NAME`];
+    const airbnb = process.env[`${prefix}AIRBNB`]      || null;
+    const booking    = process.env[`${prefix}BOOKING`]     || null;
+    const lekkeslaap = process.env[`${prefix}LEKKESLAAP`]  || null;
+    if (!name && !airbnb && !booking && !lekkeslaap) break;
+    properties.push({
+      id:          i,
+      name:        name        || `Property ${i}`,
+      description: process.env[`${prefix}DESCRIPTION`]   || "",
+      location:    process.env[`${prefix}LOCATION`]      || "",
+      nightlyRate: parseFloat(process.env[`${prefix}NIGHTLY_RATE`] || "0"),
+      currency:    process.env[`${prefix}CURRENCY`]      || "ZAR",
+      minNights:   parseInt(process.env[`${prefix}MIN_NIGHTS`]     || "1"),
+      maxGuests:   parseInt(process.env[`${prefix}MAX_GUESTS`]     || "10"),
+      photoUrl:    process.env[`${prefix}PHOTO_URL`]     || "",
+      sources: { airbnb, booking, lekkeslaap },
+    });
+    i++;
+  }
+
+  // Fall back to legacy single-property config
+  if (properties.length === 0) {
+    const airbnb      = process.env.ICAL_AIRBNB      || null;
+    const booking     = process.env.ICAL_BOOKING     || null;
+    const lekkeslaap  = process.env.ICAL_LEKKESLAAP  || null;
+    if (airbnb || booking || lekkeslaap) {
+      properties.push({
+        id:          1,
+        name:        process.env.PROPERTY_NAME        || "My Property",
+        description: process.env.PROPERTY_DESCRIPTION || "",
+        location:    process.env.PROPERTY_LOCATION    || "",
+        nightlyRate: parseFloat(process.env.NIGHTLY_RATE || "0"),
+        currency:    process.env.CURRENCY             || "ZAR",
+        minNights:   parseInt(process.env.MIN_NIGHTS  || "1"),
+        maxGuests:   parseInt(process.env.MAX_GUESTS  || "10"),
+        photoUrl:    process.env.PROPERTY_PHOTO_URL   || "",
+        sources: { airbnb, booking, lekkeslaap },
+      });
+    }
+  }
+  return properties;
+}
+
+// Legacy helper — returns sources for first property (backwards compat)
+function getSources() {
+  const props = getProperties();
+  return props.length > 0 ? props[0].sources : { airbnb: null, booking: null, lekkeslaap: null };
 }
 
 // ── Server-side polling state ────────────────────────────────
@@ -80,28 +135,30 @@ let serverCachedResults = null;   // last successful fetch results
 let serverLastFetchedAt  = null;  // timestamp of last fetch
 let serverPollTimer      = null;  // setInterval handle
 
+async function fetchPropertySources(property) {
+  const entries = Object.entries(property.sources).filter(([, u]) => u);
+  return Promise.all(entries.map(async ([name, srcUrl]) => {
+    try {
+      const text = await fetchUrl(srcUrl);
+      const hasCalendar = text.includes('BEGIN:VCALENDAR');
+      const hasEvents   = text.includes('BEGIN:VEVENT');
+      if (!hasCalendar) return { name, propertyId: property.id, success: false, data: '', error: 'No VCALENDAR' };
+      console.log(`  [P${property.id}:${name}] OK (${text.length} chars)`);
+      return { name, propertyId: property.id, success: true, data: text, error: null, empty: !hasEvents };
+    } catch(e) {
+      console.log(`  [P${property.id}:${name}] FAILED: ${e.message}`);
+      return { name, propertyId: property.id, success: false, data: '', error: e.message };
+    }
+  }));
+}
+
 async function serverFetchAll() {
-  const sources = getSources();
-  const entries = Object.entries(sources).filter(([, u]) => u);
-  if (entries.length === 0) return;
-  console.log('\n[server poll] Fetching calendars...');
+  const properties = getProperties();
+  if (properties.length === 0) return;
+  console.log(`\n[server poll] Fetching ${properties.length} propert${properties.length > 1 ? 'ies' : 'y'}...`);
   try {
-    const results = await Promise.all(
-      entries.map(async ([name, srcUrl]) => {
-        try {
-          const text = await fetchUrl(srcUrl);
-          const hasCalendar = text.includes('BEGIN:VCALENDAR');
-          const hasEvents   = text.includes('BEGIN:VEVENT');
-          if (!hasCalendar) return { name, success: false, data: '', error: 'No VCALENDAR' };
-          console.log(`  [${name}] OK (${text.length} chars)`);
-          return { name, success: true, data: text, error: null, empty: !hasEvents };
-        } catch(e) {
-          console.log(`  [${name}] FAILED: ${e.message}`);
-          return { name, success: false, data: '', error: e.message };
-        }
-      })
-    );
-    serverCachedResults = results;
+    const allResults = await Promise.all(properties.map(fetchPropertySources));
+    serverCachedResults = allResults.flat();
     serverLastFetchedAt = new Date();
     console.log(`[server poll] Done at ${serverLastFetchedAt.toLocaleTimeString()}`);
   } catch(e) {
@@ -244,17 +301,18 @@ const server = http.createServer(async (req, res) => {
   if (pathname === "/config") {
     loadConfig();
     const sources = getSources();
-    const hasLiveData = Object.values(sources).some(Boolean);
+    const hasLiveData = getProperties().length > 0;
     // Parse poll interval from config — default 2 hours, 0 = disabled
     const rawInterval = process.env.POLL_INTERVAL_MINUTES;
     const pollMinutes = rawInterval !== undefined ? parseInt(rawInterval) : 120;
     const pollIntervalMs = pollMinutes > 0 ? pollMinutes * 60 * 1000 : 0;
+    const properties = getProperties().map(p => ({ id: p.id, name: p.name, location: p.location }));
     // Start server-side polling if not already running
     if (pollIntervalMs > 0 && hasLiveData && !serverPollTimer) {
       startServerPolling(pollIntervalMs);
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ hasLiveData, pollIntervalMs }));
+    res.end(JSON.stringify({ hasLiveData, pollIntervalMs, properties }));
     return;
   }
 
@@ -269,30 +327,10 @@ const server = http.createServer(async (req, res) => {
     }
     // No cache yet — fetch immediately (first load or force refresh)
     console.log("\nFetching calendars (on-demand)...");
-    const sources = getSources();
     try {
-      const results = await Promise.all(
-        Object.entries(sources).filter(([, u]) => u).map(async ([name, srcUrl]) => {
-          try {
-            const text = await fetchUrl(srcUrl);
-            const hasCalendar = text.includes("BEGIN:VCALENDAR");
-            const hasEvents   = text.includes("BEGIN:VEVENT");
-            if (!hasCalendar) {
-              console.log(`  [${name}] INVALID — no VCALENDAR. First 200 chars: ${text.slice(0, 200)}`);
-              return { name, success: false, data: "", error: "Response was not a valid iCal feed (no BEGIN:VCALENDAR)" };
-            }
-            if (!hasEvents) {
-              console.log(`  [${name}] EMPTY — valid iCal but no events`);
-              return { name, success: true, data: text, error: null, empty: true };
-            }
-            console.log(`  [${name}] OK (${text.length} chars)`);
-            return { name, success: true, data: text, error: null };
-          } catch (e) {
-            console.log(`  [${name}] FAILED: ${e.message}`);
-            return { name, success: false, data: "", error: e.message };
-          }
-        })
-      );
+      const properties = getProperties();
+      const allResults = await Promise.all(properties.map(fetchPropertySources));
+      const results = allResults.flat();
       serverCachedResults = results;
       serverLastFetchedAt = new Date();
       res.writeHead(200, { "Content-Type": "application/json" });

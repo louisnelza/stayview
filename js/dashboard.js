@@ -8,6 +8,10 @@ let currentView   = 'upcoming';
 let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth();
 
+// ── Multi-property state ──────────────────────────────────────
+let properties       = [];   // array of { id, name, location } from /config
+let currentProperty  = 'all'; // 'all' or property id (number)
+
 // ── Auto-refresh ──────────────────────────────────────────────
 let pollInterval    = null;   // setInterval handle
 let pollMs          = 0;      // 0 = disabled
@@ -46,7 +50,7 @@ async function loadAll(force = false) {
         warnings.push(`<strong>${SOURCE_LABELS[r.name] || r.name}</strong>: response was not a valid iCal feed`);
         continue;
       }
-      const parsed = parseIcal(r.data, r.name);
+      const parsed = parseIcal(r.data, r.name, r.propertyId || 1);
       newCounts[r.name] = parsed.length;
       if (parsed.length === 0 && prevCounts[r.name] > 0) {
         warnings.push(`<strong>${SOURCE_LABELS[r.name] || r.name}</strong>: previously had ${prevCounts[r.name]} booking(s) but now returns empty — possible broken sync or expired iCal URL`);
@@ -109,7 +113,11 @@ function updateStats() {
   const in30 = new Date(now);
   in30.setDate(in30.getDate() + 30);
 
-  const real    = allBookings.filter(b => !b.isBlocked);
+  const visibleBookings = currentProperty === 'all'
+    ? allBookings
+    : allBookings.filter(b => b.propertyId === currentProperty);
+
+  const real    = visibleBookings.filter(b => !b.isBlocked);
   const active  = real.filter(b => ['checking-in', 'active', 'checking-out'].includes(getStatus(b))).length;
   const up30    = real.filter(b => b.start >= now && b.start < in30).length;
 
@@ -132,6 +140,44 @@ function updateStats() {
   }, 100);
 }
 
+// ── Property switcher ─────────────────────────────────────────
+
+function buildPropertySwitcher(props) {
+  const container = document.getElementById('property-switcher');
+  if (!container) return;
+  if (props.length <= 1) { container.style.display = 'none'; return; }
+  container.style.display = 'flex';
+  container.innerHTML = '';
+  // All properties button
+  const allBtn = document.createElement('button');
+  allBtn.className = 'prop-btn active';
+  allBtn.textContent = 'All Properties';
+  allBtn.onclick = () => setProperty('all', allBtn);
+  container.appendChild(allBtn);
+  // Individual property buttons
+  props.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'prop-btn';
+    btn.textContent = p.name;
+    btn.dataset.propertyId = p.id;
+    btn.onclick = () => setProperty(p.id, btn);
+    container.appendChild(btn);
+  });
+}
+
+function setProperty(id, el) {
+  currentProperty = id;
+  document.querySelectorAll('.prop-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  // Reset source filter to 'all' when switching property
+  currentFilter = 'all';
+  document.querySelectorAll('#src-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('#src-filters .filter-btn').classList.add('active');
+  updateStats();
+  renderBookings();
+  renderCalendar();
+}
+
 // ── Filters & view ────────────────────────────────────────────
 
 function setFilter(f, el) {
@@ -152,7 +198,10 @@ function setView(v, el) {
 
 function renderBookings() {
   const now = today();
-  const filtered = allBookings.filter(b => {
+  const visible = currentProperty === 'all'
+    ? allBookings
+    : allBookings.filter(b => b.propertyId === currentProperty);
+  const filtered = visible.filter(b => {
     if (currentFilter !== 'all' && b.source !== currentFilter) return false;
     if (currentView === 'upcoming') return b.end >= now;
     return true;
@@ -170,6 +219,11 @@ function renderBookings() {
   for (const b of filtered) {
     const status   = getStatus(b);
     const isDirect = false; // b.source === 'direct' — enabled when booking engine is released
+
+    // Show property name on card when viewing all properties
+    const propName = currentProperty === 'all' && properties.length > 1
+      ? (properties.find(p => p.id === b.propertyId) || {}).name || null
+      : null;
 
     if (currentView === 'upcoming' && status !== lastStatus) {
       if (status === 'checking-in')  html += '<div class="section-label">Checking In Today</div>';
@@ -208,6 +262,7 @@ function renderBookings() {
           <div class="badge-row">
             <span class="badge badge-${srcKey}">${srcLabel}</span>
             <span class="badge badge-${status}">${statusLabel}</span>
+            ${propName ? `<span class="badge badge-property">${escHtml(propName)}</span>` : ''}
           </div>
           ${extraDetails}
         </div>
@@ -248,7 +303,10 @@ function renderCalendar() {
     el.className  = 'cal-day';
     el.textContent = d;
     if (date.getTime() === now.getTime()) el.classList.add('today');
-    const matching = allBookings.filter(b => b.start <= date && b.end > date);
+    const calBookings = currentProperty === 'all'
+      ? allBookings
+      : allBookings.filter(b => b.propertyId === currentProperty);
+    const matching = calBookings.filter(b => b.start <= date && b.end > date);
     if (matching.length > 0) {
       const srcs = [...new Set(matching.map(b => b.isBlocked ? 'blocked' : b.source))];
       el.classList.add(srcs.length === 1 ? 'src-' + srcs[0] : 'multi');
@@ -274,35 +332,43 @@ function changeMonth(dir) {
 // ── Demo mode ─────────────────────────────────────────────────
 
 function makeDemoBookings() {
+  // Also set demo properties for the switcher
+  properties = [
+    { id: 1, name: 'Scottburgh Beach House', location: 'Scottburgh, KZN' },
+    { id: 2, name: 'Durban City Apartment',  location: 'Durban, KZN' },
+  ];
+  buildPropertySwitcher(properties);
+
   const base = today();
   const d = offset => { const x = new Date(base); x.setDate(x.getDate() + offset); return x; };
   let uid = 1;
-  const b = (source, name, startOff, nights, isBlocked = false, details = null) => ({
+  const b = (source, name, startOff, nights, isBlocked = false, details = null, propertyId = 1) => ({
     uid: 'demo-' + uid++, source, summary: name,
     start: d(startOff), end: d(startOff + nights),
-    nights, isBlocked, details,
+    nights, isBlocked, details, propertyId,
   });
   const ls = (ref, name, email, cell) => ({
     reference: ref, name, email, cell,
     viewUrl: `https://www.lekkeslaap.co.za/suppliers/bookings/quotation/${ref}`,
   });
   return [
-    b('lekkeslaap',  'Mia Pretorius',                   -3, 4, false, ls('LS-DEMO05', 'Mia Pretorius',     'mia@example.co.za',    '+27845556666')), // checking out today (day 4 of 4)
-    b('airbnb',      'Airbnb Guest',                    -2, 5),        // checked in (mid-stay)
-    b('lekkeslaap',  'Pieter van Wyk',                   0, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',    'pieter@example.co.za', '+27821234567')), // checking in today
-    b('booking',     'Booking.com Guest',                2, 2),
-    b('airbnb',      'Airbnb Guest',                     5, 5),
-    b('lekkeslaap',  'Anri Botha',                       9, 7, false, ls('LS-DEMO02', 'Anri Botha',        'anri@example.co.za',   '+27839876543')),
-    b('booking',     'Booking.com Guest',               14, 3),
-    b('airbnb',      'Airbnb Guest',                    20, 4),
-    b('lekkeslaap',  'Kobus Joubert',                   24, 2, false, ls('LS-DEMO03', 'Kobus Joubert',     'kobus@example.co.za',  '+27711112222')),
-    b('booking',     'Booking.com Guest',               27, 6),
-    b('airbnb',      'Airbnb Guest',                    33, 3),
-    b('lekkeslaap',  'Sarel du Plessis',                38, 5, false, ls('LS-DEMO04', 'Sarel du Plessis',  'sarel@example.co.za',  '+27723334444')),
-    b('booking',     'Booking.com Guest',               44, 4),
-    b('airbnb',      'Airbnb Guest',                    50, 3),
-    b('airbnb',      null,  6, 2, true),
-    b('lekkeslaap',  null, 18, 1, true),
+    // Property 1 — Scottburgh Beach House
+    b('lekkeslaap', 'Mia Pretorius',     -3, 4, false, ls('LS-DEMO05', 'Mia Pretorius',    'mia@example.co.za',    '+27845556666'), 1),
+    b('airbnb',     'Airbnb Guest',      -2, 5, false, null, 1),
+    b('lekkeslaap', 'Pieter van Wyk',     0, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',   'pieter@example.co.za', '+27821234567'), 1),
+    b('booking',    'Booking.com Guest',  2, 2, false, null, 1),
+    b('airbnb',     'Airbnb Guest',       5, 5, false, null, 1),
+    b('lekkeslaap', 'Anri Botha',         9, 7, false, ls('LS-DEMO02', 'Anri Botha',       'anri@example.co.za',   '+27839876543'), 1),
+    b('booking',    'Booking.com Guest', 14, 3, false, null, 1),
+    b('lekkeslaap', 'Kobus Joubert',     24, 2, false, ls('LS-DEMO03', 'Kobus Joubert',    'kobus@example.co.za',  '+27711112222'), 1),
+    b('airbnb',     null,  6, 2, true,   null, 1),
+    // Property 2 — Durban City Apartment
+    b('airbnb',     'Airbnb Guest',       1, 3, false, null, 2),
+    b('booking',    'Booking.com Guest',  5, 4, false, null, 2),
+    b('lekkeslaap', 'Sarel du Plessis',  12, 5, false, ls('LS-DEMO04', 'Sarel du Plessis', 'sarel@example.co.za',  '+27723334444'), 2),
+    b('airbnb',     'Airbnb Guest',      20, 3, false, null, 2),
+    b('booking',    'Booking.com Guest', 28, 6, false, null, 2),
+    b('lekkeslaap', null, 18, 1, true,   null, 2),
   ].sort((a, b) => a.start - b.start);
 }
 
@@ -322,6 +388,7 @@ function setMode(mode) {
       document.querySelector('.logo').appendChild(tag);
     }
     stopPolling();
+    currentProperty = 'all';
     allBookings = makeDemoBookings();
     document.getElementById('error-area').innerHTML = '';
     document.getElementById('last-updated').textContent = 'Demo data';
@@ -382,6 +449,8 @@ renderCalendar();
 fetch('/config')
   .then(r => r.json())
   .then(cfg => {
+    properties = cfg.properties || [];
+    buildPropertySwitcher(properties);
     if (cfg.hasLiveData) setMode('live');
     else setMode('demo');
     // Start auto-refresh if configured (only in live mode)
