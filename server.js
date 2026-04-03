@@ -79,23 +79,29 @@ function getProperties() {
   let i = 1;
   while (true) {
     const prefix = `PROPERTY_${i}_`;
-    const name   = process.env[`${prefix}NAME`];
-    const airbnb = process.env[`${prefix}AIRBNB`]      || null;
-    const booking    = process.env[`${prefix}BOOKING`]     || null;
-    const lekkeslaap = process.env[`${prefix}LEKKESLAAP`]  || null;
+    const name        = process.env[`${prefix}NAME`];
+    const airbnb      = process.env[`${prefix}AIRBNB`]      || null;
+    const booking     = process.env[`${prefix}BOOKING`]     || null;
+    const lekkeslaap  = process.env[`${prefix}LEKKESLAAP`]  || null;
+    // Stop scanning if no name AND no URLs found for this number
     if (!name && !airbnb && !booking && !lekkeslaap) break;
-    properties.push({
-      id:          i,
-      name:        name        || `Property ${i}`,
-      description: process.env[`${prefix}DESCRIPTION`]   || "",
-      location:    process.env[`${prefix}LOCATION`]      || "",
-      nightlyRate: parseFloat(process.env[`${prefix}NIGHTLY_RATE`] || "0"),
-      currency:    process.env[`${prefix}CURRENCY`]      || "ZAR",
-      minNights:   parseInt(process.env[`${prefix}MIN_NIGHTS`]     || "1"),
-      maxGuests:   parseInt(process.env[`${prefix}MAX_GUESTS`]     || "10"),
-      photoUrl:    process.env[`${prefix}PHOTO_URL`]     || "",
-      sources: { airbnb, booking, lekkeslaap },
-    });
+    // Only add the property if it has at least one iCal URL configured
+    // This prevents a config.txt with PROPERTY_1_NAME but no URLs from
+    // blocking the legacy .env fallback
+    if (airbnb || booking || lekkeslaap) {
+      properties.push({
+        id:          i,
+        name:        name        || `Property ${i}`,
+        description: process.env[`${prefix}DESCRIPTION`]   || "",
+        location:    process.env[`${prefix}LOCATION`]      || "",
+        nightlyRate: parseFloat(process.env[`${prefix}NIGHTLY_RATE`] || "0"),
+        currency:    process.env[`${prefix}CURRENCY`]      || "ZAR",
+        minNights:   parseInt(process.env[`${prefix}MIN_NIGHTS`]     || "1"),
+        maxGuests:   parseInt(process.env[`${prefix}MAX_GUESTS`]     || "10"),
+        photoUrl:    process.env[`${prefix}PHOTO_URL`]     || "",
+        sources: { airbnb, booking, lekkeslaap },
+      });
+    }
     i++;
   }
 
