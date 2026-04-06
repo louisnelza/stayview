@@ -13,6 +13,7 @@
   --airbnb:     #e8806a;
   --booking:    #5ba3d6;
   --lekkeslaap: #F47920;
+  --slaapstad:  #2a9d8f;
   --direct:     #7a6abf;
 
   /* Semantic */
@@ -30,6 +31,7 @@
 .badge-airbnb     { background: rgba(232,128,106,0.15); color: var(--airbnb); }
 .badge-booking    { background: rgba(91,163,214,0.15);  color: var(--booking); }
 .badge-lekkeslaap { background: rgba(244,121,32,0.15);  color: var(--lekkeslaap); }
+.badge-slaapstad  { background: rgba(42,157,143,0.15);  color: var(--slaapstad); }
 .badge-direct     { background: rgba(122,106,191,0.15); color: var(--direct); }
 .badge-blocked    { background: rgba(255,255,255,0.05); color: #6a6760; }
 
@@ -37,6 +39,7 @@
 .booking-card.src-airbnb     { border: 1px solid rgba(232,128,106,0.2); border-left: 3px solid var(--airbnb); }
 .booking-card.src-booking    { border: 1px solid rgba(91,163,214,0.2);  border-left: 3px solid var(--booking); }
 .booking-card.src-lekkeslaap { border: 1px solid rgba(244,121,32,0.2);  border-left: 3px solid var(--lekkeslaap); }
+.booking-card.src-slaapstad  { border: 1px solid rgba(42,157,143,0.2);   border-left: 3px solid var(--slaapstad); }
 .booking-card.src-direct     { border: 1px solid rgba(122,106,191,0.2); border-left: 3px solid var(--direct); }
 .booking-card.src-blocked    { border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid #6a6760; }
 
@@ -44,5 +47,6 @@
 .cal-day.src-airbnb     { background: rgba(232,128,106,0.18); color: var(--airbnb); }
 .cal-day.src-booking    { background: rgba(91,163,214,0.18);  color: var(--booking); }
 .cal-day.src-lekkeslaap { background: rgba(244,121,32,0.18);  color: var(--lekkeslaap); }
+.cal-day.src-slaapstad  { background: rgba(42,157,143,0.18);   color: var(--slaapstad); }
 .cal-day.src-direct     { background: rgba(122,106,191,0.18); color: var(--direct); }
 .cal-day.src-blocked    { background: rgba(255,255,255,0.05); color: #6a6760; }

@@ -106,11 +106,16 @@ function getProperties() {
   }
 
   // Fall back to legacy single-property config
+  // Reads ALL ICAL_* keys dynamically so unknown platforms (e.g. ICAL_SLAAPSTAD) work too
   if (properties.length === 0) {
-    const airbnb      = process.env.ICAL_AIRBNB      || null;
-    const booking     = process.env.ICAL_BOOKING     || null;
-    const lekkeslaap  = process.env.ICAL_LEKKESLAAP  || null;
-    if (airbnb || booking || lekkeslaap) {
+    const sources = {};
+    Object.entries(process.env).forEach(([k, v]) => {
+      if (k.startsWith('ICAL_') && v) {
+        const platform = k.replace('ICAL_', '').toLowerCase();
+        sources[platform] = v;
+      }
+    });
+    if (Object.keys(sources).length > 0) {
       properties.push({
         id:          1,
         name:        process.env.PROPERTY_NAME        || "My Property",
@@ -121,7 +126,7 @@ function getProperties() {
         minNights:   parseInt(process.env.MIN_NIGHTS  || "1"),
         maxGuests:   parseInt(process.env.MAX_GUESTS  || "10"),
         photoUrl:    process.env.PROPERTY_PHOTO_URL   || "",
-        sources: { airbnb, booking, lekkeslaap },
+        sources,
       });
     }
   }

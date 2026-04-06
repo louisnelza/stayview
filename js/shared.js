@@ -11,6 +11,7 @@ const SOURCE_LABELS = {
   airbnb:     'Airbnb',
   booking:    'Booking.com',
   lekkeslaap: 'Lekkeslaap',
+  slaapstad:  'Slaapstad',
   direct:     'Direct',
   blocked:    'Blocked',
 };

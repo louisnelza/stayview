@@ -84,6 +84,7 @@ main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
 .filter-btn.active.f-airbnb     { border-color: var(--airbnb);     color: var(--airbnb); }
 .filter-btn.active.f-booking    { border-color: var(--booking);    color: var(--booking); }
 .filter-btn.active.f-lekkeslaap { border-color: var(--lekkeslaap); color: var(--lekkeslaap); }
+.filter-btn.active.f-slaapstad  { border-color: var(--slaapstad);  color: var(--slaapstad); }
 .filter-btn.active.f-direct     { border-color: var(--direct);     color: var(--direct); }
 
 /* ── Booking cards ────────────────────────────────────────────*/
