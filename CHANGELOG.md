@@ -18,28 +18,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.1.0] — 2026-03-29
+## [1.2.0] — 2026-04-07
 
 ### Added
-- **Auto-refresh** — server-side polling re-fetches all iCal feeds on a configurable interval (`POLL_INTERVAL_MINUTES`, default 120). Polling runs on the server independently of any open browser tab (#1)
-- **Server-side cache** — `/calendars` serves cached results instantly; manual Refresh uses `?force=1` to bypass cache
-- **Page Visibility API** — when returning to the dashboard tab, stale data is refreshed immediately without waiting for the next poll cycle
-- **Stale data indicator** — "Updated X mins ago" label in the header updates every 30 seconds and pulses amber when data exceeds half the poll interval
-- **Granular booking status** — check-in day shows "Checking In" (blue), mid-stay shows "Checked In" (green), checkout day shows "Checking Out" (amber) (#25)
-- **Full Lekkeslaap guest details** — booking cards now show reference number, email address, cell number and a direct link to the booking in the Lekkeslaap supplier dashboard (#21)
-- **Modular codebase** — JS and CSS split into `js/shared.js`, `js/dashboard.js`, `css/shared.css`, `css/dashboard.css` for maintainability
+- **Multi-property support** — manage multiple rentals from one dashboard using numbered config keys (`PROPERTY_1_*`, `PROPERTY_2_*` etc.) — closes #28
+- **Property switcher** — tab bar in the header to switch between properties or view all combined
+- **Slaapstad platform** — full support for Slaapstad iCal feeds (teal colour, filter button, legend, calendar highlight)
+- **Dynamic platform visibility** — filter buttons and legend items are automatically hidden for platforms not configured in `.env` or `config.txt`
+- **Debug endpoint** — `/debug` shows exactly what the server reads from config at runtime, useful for troubleshooting
+- **Granular booking status** — check-in day shows "Checking In" (blue), mid-stay shows "Checked In" (green), checkout day shows "Checking Out" (amber) — closes #25
+- **Full Lekkeslaap guest details** — booking cards show reference number, email, cell number and a direct supplier link — closes #21
+- **Auto-refresh** — server-side polling re-fetches all iCal feeds on a configurable interval (`POLL_INTERVAL_MINUTES`, default 120) — closes #1
+- **Page Visibility API** — stale data refreshes immediately when returning to the tab
+- **Server-side cache** — `/calendars` serves cached results instantly; manual Refresh bypasses cache with `?force=1`
+- **Stale data indicator** — "Updated X mins ago" label pulses amber when data exceeds half the poll interval
 - **SETUP.md** — user-friendly setup guide for non-technical users running the packaged executable
 
 ### Fixed
+- Windows CRLF line endings (`\r`) corrupting `.env` and `config.txt` URL values
+- `config.txt` with empty `PROPERTY_1_*` keys no longer blocks `.env` credentials
+- Legacy `.env` fallback now reads all `ICAL_*` keys dynamically — unknown platforms no longer silently dropped
 - iCal line folding — multi-line SUMMARY values (Lekkeslaap) now correctly unfolded before parsing
 - Lekkeslaap guest name truncation — name extraction stops at Email/Reference/BOOKING keywords
-- `.env` no longer overridden by a blank `config.txt` — iCal credentials fall through to `.env` if `config.txt` has no URLs set
 - Browser tab throttling — polling moved to server-side so overnight background tabs no longer show stale data
 
 ### Changed
-- `config.txt` and `.env` responsibilities clarified: `config.txt` for executable users, `.env` for developers/Pi/cloud
+- Codebase restructured into `js/shared.js`, `js/dashboard.js`, `css/shared.css`, `css/dashboard.css` for maintainability
+- `.env` and `config.txt` responsibilities clarified — `config.txt` for executable users, `.env` for developers/Pi/cloud
 - `config.txt`, `bookings.json`, `dist/`, `package-lock.json` added to `.gitignore`
-- Section labels in upcoming view updated: "Currently Active" → "Checking In Today", "Currently Staying", "Checking Out Today"
+- Section labels updated — "Currently Active" → "Checking In Today", "Currently Staying", "Checking Out Today"
+- New multi-property config format (`PROPERTY_1_*`) — fully backwards compatible with legacy `ICAL_*` format
+
+---
+
+## [1.1.0] — 2026-03-29
+
+### Added
+- Auto-refresh with configurable poll interval and stale data indicator
+- Granular booking status — Checking In, Checked In, Checking Out
+- Full Lekkeslaap booking details — reference, email, cell, supplier link
+- Modular codebase — JS and CSS split into separate files
+- SETUP.md — setup guide for executable users
+
+### Fixed
+- iCal line folding for Lekkeslaap multi-line SUMMARY values
+- Lekkeslaap guest name truncation
+- `.env` not overridden by blank `config.txt`
+- Browser tab throttling causing stale data overnight
+
+### Changed
+- `config.txt` and `.env` responsibilities clarified
+- Section labels improved
 
 ---
 
@@ -50,20 +79,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Unified booking dashboard aggregating Airbnb, Booking.com and Lekkeslaap iCal feeds
 - Mini calendar with colour-coded bookings per platform
 - 30-day occupancy stats and booking counts
-- Platform filter buttons (All / Airbnb / Booking.com / Lekkeslaap)
-- Upcoming / All view toggle
-- Demo mode with realistic sample data — works without iCal credentials
+- Platform filter buttons and upcoming/all view toggle
+- Demo mode with realistic sample data
 - Live / Demo mode toggle in header
-- Local proxy server (`server.js`) — fetches iCal feeds server-side, no CORS issues
+- Local proxy server — fetches iCal feeds server-side, no CORS issues
 - Supports `.env` and `config.txt` for configuration
-- Packaged executables for Windows, Mac and Linux via `pkg` (no Node.js required)
-- Raspberry Pi deployment via systemd service (`stayview.service`)
-- Render deployment support with `npm start`
-- Lekkeslaap guest names parsed from `Customer:` field in SUMMARY
-- Airbnb "Reserved" shown as "Airbnb Guest"
-- Booking.com "CLOSED - Not available" shown as "Booking.com Guest"
-- Blocked dates correctly excluded from booking counts
-- Silent empty calendar detection using localStorage booking count comparison
-- Stricter iCal validation — distinguishes fetch failure, invalid feed, and empty calendar
-- `.env` re-read on every request so changes apply without server restart
+- Packaged executables for Windows, Mac and Linux via `pkg`
+- Raspberry Pi deployment via systemd service
+- Render deployment support
 - MIT licence
