@@ -15,7 +15,11 @@
     ],
     "outputPath": "dist",
     "assets": [
-      "index.html"
+      "index.html",
+      "js/shared.js",
+      "js/dashboard.js",
+      "css/shared.css",
+      "css/dashboard.css"
     ]
   },
   "engines": {
