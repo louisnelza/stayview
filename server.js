@@ -412,18 +412,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Booking engine: public page ──────────────────────────────
+  // Booking engine — enabled when feature/booking-engine is released
   if (pathname === "/book" || pathname === "/book.html") {
+    const bookFile = ["book", "html"].join("."); // dynamic so pkg doesn't scan it
     const bookExternal = path.join(
       process.pkg ? path.dirname(process.execPath) : __dirname,
-      "book.html"
+      bookFile
     );
     let bookHtml = null;
     if (fs.existsSync(bookExternal)) {
       bookHtml = fs.readFileSync(bookExternal, "utf8");
-    } else {
-      try { bookHtml = fs.readFileSync(path.join(__dirname, "book.html"), "utf8"); } catch(e) {}
     }
-    if (!bookHtml) { res.writeHead(404); res.end("book.html not found — make sure book.html is in the same folder as server.js"); return; }
+    if (!bookHtml) { res.writeHead(404); res.end("Booking engine not yet available."); return; }
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
     res.end(bookHtml);
     return;
