@@ -32,6 +32,7 @@ function loadConfig() {
   if (fs.existsSync(configPath)) {
     const configVars = {};
     fs.readFileSync(configPath, "utf8")
+      .replace(/\r/g, "")
       .split("\n")
       .forEach(line => {
         line = line.trim();
@@ -57,11 +58,15 @@ function loadConfig() {
   }
 
   // Load .env for iCal credentials (developers / Pi with real data)
+  // .replace(/\r/g, '') strips Windows CRLF line endings
   const envPath = path.join(__dirname, ".env");
   if (fs.existsSync(envPath)) {
     fs.readFileSync(envPath, "utf8")
+      .replace(/\r/g, "")
       .split("\n")
       .forEach(line => {
+        line = line.trim();
+        if (!line || line.startsWith("#")) return;
         const [key, ...val] = line.split("=");
         if (key && val.length) process.env[key.trim()] = val.join("=").trim();
       });
@@ -350,6 +355,19 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: e.message }));
     }
+    return;
+  }
+
+  // ── Debug endpoint ───────────────────────────────────────────
+  if (pathname === "/debug") {
+    loadConfig();
+    const icalKeys = Object.entries(process.env)
+      .filter(([k]) => k.startsWith("ICAL_"))
+      .map(([k, v]) => ({ key: k, value: v, length: v.length, lastChar: v.charCodeAt(v.length - 1) }));
+    const propKeys = Object.keys(process.env).filter(k => k.startsWith("PROPERTY_"));
+    const props = getProperties();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ icalKeys, propKeys, propertiesFound: props.length, properties: props }, null, 2));
     return;
   }
 
