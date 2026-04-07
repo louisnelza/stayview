@@ -42,18 +42,20 @@ function loadConfig() {
       });
     // Only use config.txt for iCal if at least one URL is actually set
     // Otherwise fall through to .env so a blank config.txt doesn't override real credentials
-    // Check for either legacy iCal keys or new multi-property keys
-    const hasIcalInConfig = !!(
-      configVars.ICAL_AIRBNB || configVars.ICAL_BOOKING || configVars.ICAL_LEKKESLAAP ||
-      Object.keys(configVars).some(k => k.match(/^PROPERTY_\d+_(AIRBNB|BOOKING|LEKKESLAAP)$/))
+    // Only use config.txt as the iCal source if at least one iCal URL has a value
+    // This prevents an empty config.txt template from blocking .env credentials
+    const hasIcalInConfig = Object.entries(configVars).some(([k, v]) =>
+      v && (k.startsWith("ICAL_") || k.match(/^PROPERTY_\d+_(AIRBNB|BOOKING|LEKKESLAAP)$/))
     );
     if (hasIcalInConfig) {
       Object.assign(process.env, configVars);
       return;
     }
-    // Apply non-iCal settings (property name, rate etc) but keep iCal from .env
+    // No iCal URLs in config.txt — apply non-iCal settings only, let .env handle credentials
     Object.entries(configVars).forEach(([k, v]) => {
-      if (!k.startsWith("ICAL_")) process.env[k] = v;
+      if (!k.startsWith("ICAL_") && !k.match(/^PROPERTY_\d+_(AIRBNB|BOOKING|LEKKESLAAP)$/)) {
+        process.env[k] = v;
+      }
     });
   }
 
@@ -323,12 +325,19 @@ const server = http.createServer(async (req, res) => {
     const pollMinutes = rawInterval !== undefined ? parseInt(rawInterval) : 120;
     const pollIntervalMs = pollMinutes > 0 ? pollMinutes * 60 * 1000 : 0;
     const properties = getProperties().map(p => ({ id: p.id, name: p.name, location: p.location }));
+    // Collect all active platform names across all properties
+    const activePlatforms = [...new Set(
+      getProperties().flatMap(p => Object.entries(p.sources)
+        .filter(([, v]) => v)
+        .map(([k]) => k)
+      )
+    )];
     // Start server-side polling if not already running
     if (pollIntervalMs > 0 && hasLiveData && !serverPollTimer) {
       startServerPolling(pollIntervalMs);
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ hasLiveData, pollIntervalMs, properties }));
+    res.end(JSON.stringify({ hasLiveData, pollIntervalMs, properties, activePlatforms }));
     return;
   }
 

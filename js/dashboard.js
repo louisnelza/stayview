@@ -142,6 +142,22 @@ function updateStats() {
 
 // ── Property switcher ─────────────────────────────────────────
 
+// Show only filter buttons and legend items for platforms that are configured.
+// Elements are tagged with data-platform="airbnb" etc. in index.html.
+function applyActivePlatforms(platforms) {
+  if (!platforms || platforms.length === 0) return;
+  // Filter buttons
+  document.querySelectorAll('#src-filters .filter-btn[data-platform]').forEach(btn => {
+    const platform = btn.dataset.platform;
+    btn.style.display = platforms.includes(platform) ? '' : 'none';
+  });
+  // Legend items
+  document.querySelectorAll('.legend-item[data-platform]').forEach(item => {
+    const platform = item.dataset.platform;
+    item.style.display = platforms.includes(platform) ? '' : 'none';
+  });
+}
+
 function buildPropertySwitcher(props) {
   const container = document.getElementById('property-switcher');
   if (!container) return;
@@ -451,9 +467,10 @@ fetch('/config')
   .then(cfg => {
     properties = cfg.properties || [];
     buildPropertySwitcher(properties);
+    // Show only filter buttons and legend items for configured platforms
+    applyActivePlatforms(cfg.activePlatforms || []);
     if (cfg.hasLiveData) setMode('live');
     else setMode('demo');
-    // Start auto-refresh if configured (only in live mode)
     if (cfg.pollIntervalMs > 0 && cfg.hasLiveData) {
       startPolling(cfg.pollIntervalMs);
     }
