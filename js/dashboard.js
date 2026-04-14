@@ -278,6 +278,7 @@ function renderBookings() {
           <div class="badge-row">
             <span class="badge badge-${srcKey}">${srcLabel}</span>
             <span class="badge badge-${status}">${statusLabel}</span>
+            ${b.provisional ? '<span class="badge badge-provisional">Provisional</span>' : ''}
             ${propName ? `<span class="badge badge-property">${escHtml(propName)}</span>` : ''}
           </div>
           ${extraDetails}

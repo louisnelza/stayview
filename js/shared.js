@@ -130,15 +130,20 @@ function parseIcal(text, source, propertyId = 1) {
 
     // Parse all available fields for Lekkeslaap
     let details = null;
+    let provisional = false;
     if (source === 'lekkeslaap' && !isBlocked) {
       details = parseLekkeslaapSummary(rawSummary);
+      // Provisional booking — Lekkeslaap sends reference + view URL but no guest name yet
+      provisional = !!(details && details.reference && !details.name);
     }
 
     const summary = isBlocked
       ? (rawSummary || description || 'Blocked')
-      : extractGuestName(rawSummary, description, source);
+      : provisional
+        ? 'Provisional Booking'
+        : extractGuestName(rawSummary, description, source);
 
-    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details, propertyId });
+    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details, propertyId, provisional });
   }
   return bookings;
 }

@@ -239,6 +239,11 @@ main { padding: 24px 28px; max-width: 1300px; margin: 0 auto; }
   color: var(--text3);
   font-style: italic;
 }
+.badge-provisional {
+  background: rgba(200,169,110,0.15);
+  color: var(--accent);
+  border: 1px solid rgba(200,169,110,0.3);
+}
 
 @media (max-width: 900px) {
   .property-switcher { order: 3; width: 100%; justify-content: flex-start; padding: 8px 0 0; }
