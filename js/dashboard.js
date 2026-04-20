@@ -219,7 +219,11 @@ function renderBookings() {
     : allBookings.filter(b => b.propertyId === currentProperty);
   const filtered = visible.filter(b => {
     if (currentFilter !== 'all' && b.source !== currentFilter) return false;
-    if (currentView === 'upcoming') return b.end >= now;
+    if (currentView === 'upcoming') {
+      // Hide blocked dates in upcoming view — they clutter the guest list
+      if (b.isBlocked) return false;
+      return b.end >= now;
+    }
     return true;
   });
 
@@ -229,10 +233,19 @@ function renderBookings() {
     return;
   }
 
+  // In 'all' view, sort blocked dates to the bottom so they don't
+  // interrupt the guest booking list
+  const realBookings    = filtered.filter(b => !b.isBlocked);
+  const blockedBookings = filtered.filter(b => b.isBlocked);
+  const sorted = currentView === 'all'
+    ? [...realBookings, ...blockedBookings]
+    : filtered;
+
   let html = '<div class="bookings-list">';
   let lastStatus = null;
+  let blockedSectionShown = false;
 
-  for (const b of filtered) {
+  for (const b of sorted) {
     const status   = getStatus(b);
     const isDirect = false; // b.source === 'direct' — enabled when booking engine is released
 
@@ -241,12 +254,24 @@ function renderBookings() {
       ? (properties.find(p => p.id === b.propertyId) || {}).name || null
       : null;
 
-    if (currentView === 'upcoming' && status !== lastStatus) {
+    // Section labels — never show status labels for blocked dates
+    if (!b.isBlocked && currentView === 'upcoming' && status !== lastStatus) {
       if (status === 'checking-in')  html += '<div class="section-label">Checking In Today</div>';
       if (status === 'checking-out') html += '<div class="section-label">Checking Out Today</div>';
       if (status === 'active')       html += '<div class="section-label">Currently Staying</div>';
       if (status === 'upcoming')     html += '<div class="section-label">Upcoming</div>';
       lastStatus = status;
+    }
+    // In 'all' view, show a single "Blocked Dates" label before the first blocked entry
+    if (b.isBlocked && currentView === 'all' && !blockedSectionShown) {
+      html += '<div class="section-label">Blocked Dates</div>';
+      blockedSectionShown = true;
+    }
+
+    // In 'all' view, add a clear divider before blocked dates
+    if (currentView === 'all' && b.isBlocked && !blockedSectionShown) {
+      html += '<div class="section-label">Blocked Dates</div>';
+      blockedSectionShown = true;
     }
 
     const name     = b.isBlocked ? (b.summary || 'Blocked') : b.summary.split('(')[0].trim();
