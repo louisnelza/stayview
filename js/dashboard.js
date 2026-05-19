@@ -42,6 +42,10 @@ async function loadAll(force = false) {
     const newCounts = {};
 
     for (const r of results) {
+      // Stale cache — source failed but serving last known good data
+      if (r.stale) {
+        warnings.push(`<strong>${SOURCE_LABELS[r.name] || r.name}</strong>: using cached data — ${r.staleReason || 'platform temporarily unavailable'}`);
+      }
       if (!r.success) {
         warnings.push(`<strong>${SOURCE_LABELS[r.name] || r.name}</strong>: ${r.error || 'fetch failed'}`);
         continue;

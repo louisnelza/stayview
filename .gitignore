@@ -18,3 +18,4 @@ dist/
 # Generated files
 package-lock.json
 bookings.json
+ical-cache.json
