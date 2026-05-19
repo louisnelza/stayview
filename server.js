@@ -148,23 +148,92 @@ function getSources() {
 
 // ── Server-side polling state ────────────────────────────────
 // The server polls iCal feeds independently of the browser tab.
-// This means data stays fresh even when no browser is open.
-let serverCachedResults = null;   // last successful fetch results
-let serverLastFetchedAt  = null;  // timestamp of last fetch
-let serverPollTimer      = null;  // setInterval handle
+// Per-source cache: only updates when a source succeeds.
+// Failed sources serve last known good data instead of an error.
+// Cache is persisted to disk so it survives server restarts.
+let serverSourceCache   = {};     // { "1:airbnb": { result, fetchedAt } }
+let serverLastFetchedAt = null;   // timestamp of last poll attempt
+let serverPollTimer     = null;   // setInterval handle
+
+function getCachePath() {
+  const baseDir = process.pkg ? path.dirname(process.execPath) : __dirname;
+  return path.join(baseDir, "ical-cache.json");
+}
+
+function loadDiskCache() {
+  try {
+    const cachePath = getCachePath();
+    if (!fs.existsSync(cachePath)) return;
+    const raw = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+    // Restore cache entries — convert fetchedAt strings back to Date objects
+    Object.entries(raw).forEach(([key, entry]) => {
+      serverSourceCache[key] = {
+        result: entry.result,
+        fetchedAt: new Date(entry.fetchedAt),
+      };
+    });
+    const count = Object.keys(serverSourceCache).length;
+    console.log(`[cache] Loaded ${count} cached source${count !== 1 ? 's' : ''} from disk`);
+  } catch(e) {
+    console.warn('[cache] Could not load disk cache:', e.message);
+  }
+}
+
+function saveDiskCache() {
+  try {
+    const serializable = {};
+    Object.entries(serverSourceCache).forEach(([key, entry]) => {
+      serializable[key] = {
+        result: entry.result,
+        fetchedAt: entry.fetchedAt.toISOString(),
+      };
+    });
+    fs.writeFileSync(getCachePath(), JSON.stringify(serializable, null, 2));
+  } catch(e) {
+    console.warn('[cache] Could not save disk cache:', e.message);
+  }
+}
+
+// Build results array from cache
+function buildCachedResults() {
+  return Object.values(serverSourceCache).map(entry => entry.result);
+}
+
+// Load cache from disk on startup
+loadDiskCache();
 
 async function fetchPropertySources(property) {
   const entries = Object.entries(property.sources).filter(([, u]) => u);
   return Promise.all(entries.map(async ([name, srcUrl]) => {
+    const cacheKey = `${property.id}:${name}`;
     try {
       const text = await fetchUrl(srcUrl);
       const hasCalendar = text.includes('BEGIN:VCALENDAR');
       const hasEvents   = text.includes('BEGIN:VEVENT');
-      if (!hasCalendar) return { name, propertyId: property.id, success: false, data: '', error: 'No VCALENDAR' };
+      if (!hasCalendar) {
+        console.log(`  [P${property.id}:${name}] INVALID — no VCALENDAR`);
+        // Don't update cache — keep last known good data
+        const cached = serverSourceCache[cacheKey];
+        if (cached) {
+          console.log(`  [P${property.id}:${name}] Serving cached data from ${cached.fetchedAt.toLocaleTimeString()}`);
+          return { ...cached.result, stale: true };
+        }
+        return { name, propertyId: property.id, success: false, data: '', error: 'No VCALENDAR' };
+      }
+      const result = { name, propertyId: property.id, success: true, data: text, error: null, empty: !hasEvents, stale: false };
+      serverSourceCache[cacheKey] = { result, fetchedAt: new Date() };
+      saveDiskCache();
       console.log(`  [P${property.id}:${name}] OK (${text.length} chars)`);
-      return { name, propertyId: property.id, success: true, data: text, error: null, empty: !hasEvents };
+      return result;
     } catch(e) {
       console.log(`  [P${property.id}:${name}] FAILED: ${e.message}`);
+      // Serve last known good data if available
+      const cached = serverSourceCache[cacheKey];
+      if (cached) {
+        const ageMin = Math.round((Date.now() - cached.fetchedAt) / 60000);
+        console.log(`  [P${property.id}:${name}] Serving cached data from ${ageMin} min ago`);
+        return { ...cached.result, stale: true, staleReason: e.message };
+      }
       return { name, propertyId: property.id, success: false, data: '', error: e.message };
     }
   }));
@@ -175,8 +244,7 @@ async function serverFetchAll() {
   if (properties.length === 0) return;
   console.log(`\n[server poll] Fetching ${properties.length} propert${properties.length > 1 ? 'ies' : 'y'}...`);
   try {
-    const allResults = await Promise.all(properties.map(fetchPropertySources));
-    serverCachedResults = allResults.flat();
+    await Promise.all(properties.map(fetchPropertySources));
     serverLastFetchedAt = new Date();
     console.log(`[server poll] Done at ${serverLastFetchedAt.toLocaleTimeString()}`);
   } catch(e) {
@@ -187,10 +255,55 @@ async function serverFetchAll() {
 function startServerPolling(intervalMs) {
   if (serverPollTimer) clearInterval(serverPollTimer);
   if (intervalMs <= 0) return;
-  // Fetch immediately on start, then on interval
   serverFetchAll();
   serverPollTimer = setInterval(serverFetchAll, intervalMs);
   console.log(`[server poll] Auto-refresh every ${Math.round(intervalMs / 60000)} minutes`);
+}
+
+// Retry fetching any sources that have never been successfully cached.
+// Runs every 5 minutes until all sources have at least one cached entry.
+let retryTimer = null;
+
+function startCachePrimer() {
+  if (retryTimer) return; // already running
+  retryTimer = setInterval(async () => {
+    const properties = getProperties();
+    const uncached = [];
+    for (const prop of properties) {
+      for (const [name, url] of Object.entries(prop.sources)) {
+        if (!url) continue;
+        const key = `${prop.id}:${name}`;
+        if (!serverSourceCache[key]) {
+          uncached.push({ prop, name, url, key });
+        }
+      }
+    }
+    if (uncached.length === 0) {
+      console.log('[cache] All sources cached — stopping retry timer');
+      clearInterval(retryTimer);
+      retryTimer = null;
+      return;
+    }
+    console.log(`[cache] Retrying ${uncached.length} uncached source${uncached.length > 1 ? 's' : ''}...`);
+    await Promise.all(uncached.map(async ({ prop, name, url, key }) => {
+      try {
+        const text = await fetchUrl(url);
+        const hasCalendar = text.includes('BEGIN:VCALENDAR');
+        if (!hasCalendar) { console.log(`  [${name}] retry: invalid iCal`); return; }
+        const result = {
+          name, propertyId: prop.id, success: true,
+          data: text, error: null,
+          empty: !text.includes('BEGIN:VEVENT'), stale: false,
+        };
+        serverSourceCache[key] = { result, fetchedAt: new Date() };
+        saveDiskCache();
+        console.log(`  [${name}] retry: cached successfully`);
+      } catch(e) {
+        console.log(`  [${name}] retry: still failing — ${e.message}`);
+      }
+    }));
+  }, 5 * 60 * 1000); // retry every 5 minutes
+  console.log('[cache] Cache primer started — will retry uncached sources every 5 minutes');
 }
 
 const HEADERS = {
@@ -336,6 +449,8 @@ const server = http.createServer(async (req, res) => {
     if (pollIntervalMs > 0 && hasLiveData && !serverPollTimer) {
       startServerPolling(pollIntervalMs);
     }
+    // Start cache primer — retries any uncached sources every 5 minutes
+    if (hasLiveData) startCachePrimer();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ hasLiveData, pollIntervalMs, properties, activePlatforms }));
     return;
@@ -344,22 +459,39 @@ const server = http.createServer(async (req, res) => {
   if (pathname === "/calendars") {
     const url = new URL(req.url, "http://localhost");
     const forceRefresh = url.searchParams.get("force") === "1";
-    // Serve cached results if available and not forced
-    if (serverCachedResults && !forceRefresh) {
+    const hasCachedData = Object.keys(serverSourceCache).length > 0;
+
+    if (forceRefresh) {
+      // Force — fetch fresh then return updated cache
+      console.log("\nFetching calendars (force refresh)...");
+      try {
+        const properties = getProperties();
+        await Promise.all(properties.map(fetchPropertySources));
+        serverLastFetchedAt = new Date();
+      } catch(e) {
+        console.error('[calendars] Force refresh error:', e.message);
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(serverCachedResults));
+      res.end(JSON.stringify(buildCachedResults()));
       return;
     }
-    // No cache yet — fetch immediately (first load or force refresh)
-    console.log("\nFetching calendars (on-demand)...");
+
+    if (hasCachedData) {
+      // Always serve cache immediately — never block waiting for a live fetch
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(buildCachedResults()));
+      return;
+    }
+
+    // Truly empty cache — first ever cold start with no disk cache
+    // Best-effort fetch; cache primer will fill gaps in background
+    console.log("\nFetching calendars (cold start)...");
     try {
       const properties = getProperties();
-      const allResults = await Promise.all(properties.map(fetchPropertySources));
-      const results = allResults.flat();
-      serverCachedResults = results;
+      await Promise.all(properties.map(fetchPropertySources));
       serverLastFetchedAt = new Date();
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(results));
+      res.end(JSON.stringify(buildCachedResults()));
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: e.message }));
@@ -375,8 +507,32 @@ const server = http.createServer(async (req, res) => {
       .map(([k, v]) => ({ key: k, value: v, length: v.length, lastChar: v.charCodeAt(v.length - 1) }));
     const propKeys = Object.keys(process.env).filter(k => k.startsWith("PROPERTY_"));
     const props = getProperties();
+    const cacheStatus = Object.entries(serverSourceCache).map(([key, entry]) => ({
+      key,
+      fetchedAt: entry.fetchedAt,
+      ageMinutes: Math.round((Date.now() - entry.fetchedAt) / 60000),
+      dataLength: entry.result.data ? entry.result.data.length : 0,
+      success: entry.result.success,
+    }));
+    // Find which sources have never been cached
+    const uncachedSources = [];
+    for (const prop of props) {
+      for (const [name, url] of Object.entries(prop.sources)) {
+        if (!url) continue;
+        const key = `${prop.id}:${name}`;
+        if (!serverSourceCache[key]) uncachedSources.push(key);
+      }
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ icalKeys, propKeys, propertiesFound: props.length, properties: props }, null, 2));
+    res.end(JSON.stringify({
+      icalKeys, propKeys,
+      propertiesFound: props.length,
+      properties: props,
+      cacheStatus,
+      uncachedSources,
+      cacheComplete: uncachedSources.length === 0,
+      retryActive: !!retryTimer,
+    }, null, 2));
     return;
   }
 
