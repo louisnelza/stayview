@@ -12,6 +12,9 @@ let calMonth = new Date().getMonth();
 let properties       = [];   // array of { id, name, location } from /config
 let currentProperty  = 'all'; // 'all' or property id (number)
 
+// ── Turnaround state ──────────────────────────────────────────
+let turnaroundDays   = new Set(); // Set of "YYYY-MM-DD" strings
+
 // ── Auto-refresh ──────────────────────────────────────────────
 let pollInterval    = null;   // setInterval handle
 let pollMs          = 0;      // 0 = disabled
@@ -79,6 +82,7 @@ async function loadAll(force = false) {
     // } catch(e) { console.warn('Could not load direct bookings:', e); }
 
     allBookings.sort((a, b) => a.start - b.start);
+    turnaroundDays = findTurnarounds(allBookings);
 
     if (warnings.length) {
       document.getElementById('error-area').innerHTML =
@@ -266,10 +270,20 @@ function renderBookings() {
       if (status === 'upcoming')     html += '<div class="section-label">Upcoming</div>';
       lastStatus = status;
     }
-    // In 'all' view, show a single "Blocked Dates" label before the first blocked entry
-    if (b.isBlocked && currentView === 'all' && !blockedSectionShown) {
-      html += '<div class="section-label">Blocked Dates</div>';
-      blockedSectionShown = true;
+    // Show turnaround banner before a checking-in booking when the
+    // previous booking checks out on the same day
+    const checkoutDateStr = b.start.toISOString().slice(0, 10);
+    if (!b.isBlocked && status !== 'past' && turnaroundDays.has(checkoutDateStr)) {
+      // Only show if there's a checkout on this same day (not just checkin)
+      const hasCheckout = sorted.some(other =>
+        !other.isBlocked &&
+        other.uid !== b.uid &&
+        other.propertyId === b.propertyId &&
+        other.end.toISOString().slice(0, 10) === checkoutDateStr
+      );
+      if (hasCheckout && b.start.toISOString().slice(0, 10) === checkoutDateStr) {
+        html += `<div class="turnaround-banner">🔄 Turnaround day — clean and prepare before next guest</div>`;
+      }
     }
 
     // In 'all' view, add a clear divider before blocked dates
@@ -278,7 +292,11 @@ function renderBookings() {
       blockedSectionShown = true;
     }
 
-    const name     = b.isBlocked ? (b.summary || 'Blocked') : b.summary.split('(')[0].trim();
+    // In 'all' view, show a single "Blocked Dates" label before the first blocked entry
+    if (b.isBlocked && currentView === 'all' && !blockedSectionShown) {
+      html += '<div class="section-label">Blocked Dates</div>';
+      blockedSectionShown = true;
+    }
     const srcKey   = b.isBlocked ? 'blocked' : b.source;
     const srcLabel = b.isBlocked ? 'Blocked' : (SOURCE_LABELS[b.source] || b.source);
     const statusLabel = {
@@ -353,6 +371,9 @@ function renderCalendar() {
       ? allBookings
       : allBookings.filter(b => b.propertyId === currentProperty);
     const matching = calBookings.filter(b => b.start <= date && b.end > date);
+    const dateStr = date.toISOString().slice(0, 10);
+    const isTurnaround = turnaroundDays.has(dateStr);
+    if (isTurnaround) el.classList.add('turnaround');
     if (matching.length > 0) {
       const srcs = [...new Set(matching.map(b => b.isBlocked ? 'blocked' : b.source))];
       el.classList.add(srcs.length === 1 ? 'src-' + srcs[0] : 'multi');
@@ -399,19 +420,19 @@ function makeDemoBookings() {
   });
   return [
     // Property 1 — Scottburgh Beach House
-    b('lekkeslaap', 'Mia Pretorius',     -3, 4, false, ls('LS-DEMO05', 'Mia Pretorius',    'mia@example.co.za',    '+27845556666'), 1),
-    b('airbnb',     'Airbnb Guest',      -2, 5, false, null, 1),
-    b('lekkeslaap', 'Pieter van Wyk',     0, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',   'pieter@example.co.za', '+27821234567'), 1),
-    b('booking',    'Booking.com Guest',  2, 2, false, null, 1),
-    b('airbnb',     'Airbnb Guest',       5, 5, false, null, 1),
-    b('lekkeslaap', 'Anri Botha',         9, 7, false, ls('LS-DEMO02', 'Anri Botha',       'anri@example.co.za',   '+27839876543'), 1),
-    b('booking',    'Booking.com Guest', 14, 3, false, null, 1),
-    b('lekkeslaap', 'Kobus Joubert',     24, 2, false, ls('LS-DEMO03', 'Kobus Joubert',    'kobus@example.co.za',  '+27711112222'), 1),
+    b('lekkeslaap', 'Mia Pretorius',     -3, 3, false, ls('LS-DEMO05', 'Mia Pretorius',    'mia@example.co.za',    '+27845556666'), 1), // checks out today → turnaround!
+    b('airbnb',     'Airbnb Guest',       0, 5, false, null, 1),                                                                          // checks in today → turnaround!
+    b('lekkeslaap', 'Pieter van Wyk',     5, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',   'pieter@example.co.za', '+27821234567'), 1),
+    b('booking',    'Booking.com Guest',  8, 2, false, null, 1),
+    b('airbnb',     'Airbnb Guest',      10, 5, false, null, 1),
+    b('lekkeslaap', 'Anri Botha',        15, 7, false, ls('LS-DEMO02', 'Anri Botha',       'anri@example.co.za',   '+27839876543'), 1),
+    b('booking',    'Booking.com Guest', 22, 3, false, null, 1),
+    b('lekkeslaap', 'Kobus Joubert',     28, 2, false, ls('LS-DEMO03', 'Kobus Joubert',    'kobus@example.co.za',  '+27711112222'), 1),
     b('airbnb',     null,  6, 2, true,   null, 1),
     // Property 2 — Durban City Apartment
     b('airbnb',     'Airbnb Guest',       1, 3, false, null, 2),
-    b('booking',    'Booking.com Guest',  5, 4, false, null, 2),
-    b('lekkeslaap', 'Sarel du Plessis',  12, 5, false, ls('LS-DEMO04', 'Sarel du Plessis', 'sarel@example.co.za',  '+27723334444'), 2),
+    b('booking',    'Booking.com Guest',  4, 4, false, null, 2), // checks out day 4 → turnaround!
+    b('lekkeslaap', 'Sarel du Plessis',   8, 5, false, ls('LS-DEMO04', 'Sarel du Plessis', 'sarel@example.co.za',  '+27723334444'), 2), // checks in day 4 → turnaround!
     b('airbnb',     'Airbnb Guest',      20, 3, false, null, 2),
     b('booking',    'Booking.com Guest', 28, 6, false, null, 2),
     b('lekkeslaap', null, 18, 1, true,   null, 2),
@@ -436,6 +457,7 @@ function setMode(mode) {
     stopPolling();
     currentProperty = 'all';
     allBookings = makeDemoBookings();
+    turnaroundDays = findTurnarounds(allBookings);
     document.getElementById('error-area').innerHTML = '';
     document.getElementById('last-updated').textContent = 'Demo data';
     updateStats();
