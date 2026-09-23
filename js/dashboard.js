@@ -273,7 +273,7 @@ function renderBookings() {
     // Show turnaround banner before a checking-in booking when the
     // previous booking checks out on the same day
     const checkoutDateStr = b.start.toISOString().slice(0, 10);
-    if (!b.isBlocked && status !== 'past' && turnaroundDays.has(checkoutDateStr)) {
+    if (!b.isBlocked && status !== 'past' && turnaroundDays instanceof Set && turnaroundDays.has(checkoutDateStr)) {
       // Only show if there's a checkout on this same day (not just checkin)
       const hasCheckout = sorted.some(other =>
         !other.isBlocked &&
@@ -284,12 +284,6 @@ function renderBookings() {
       if (hasCheckout && b.start.toISOString().slice(0, 10) === checkoutDateStr) {
         html += `<div class="turnaround-banner">🔄 Turnaround day — clean and prepare before next guest</div>`;
       }
-    }
-
-    // In 'all' view, add a clear divider before blocked dates
-    if (currentView === 'all' && b.isBlocked && !blockedSectionShown) {
-      html += '<div class="section-label">Blocked Dates</div>';
-      blockedSectionShown = true;
     }
 
     // In 'all' view, show a single "Blocked Dates" label before the first blocked entry
@@ -372,7 +366,7 @@ function renderCalendar() {
       : allBookings.filter(b => b.propertyId === currentProperty);
     const matching = calBookings.filter(b => b.start <= date && b.end > date);
     const dateStr = date.toISOString().slice(0, 10);
-    const isTurnaround = turnaroundDays.has(dateStr);
+    const isTurnaround = turnaroundDays instanceof Set && turnaroundDays.has(dateStr);
     if (isTurnaround) el.classList.add('turnaround');
     if (matching.length > 0) {
       const srcs = [...new Set(matching.map(b => b.isBlocked ? 'blocked' : b.source))];
@@ -456,6 +450,7 @@ function setMode(mode) {
     }
     stopPolling();
     currentProperty = 'all';
+    turnaroundDays = new Set();
     allBookings = makeDemoBookings();
     turnaroundDays = findTurnarounds(allBookings);
     document.getElementById('error-area').innerHTML = '';
