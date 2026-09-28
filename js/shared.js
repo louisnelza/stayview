@@ -59,18 +59,22 @@ function getStatus(b) {
 // on the same day within the same property.
 function findTurnarounds(bookings) {
   const turnarounds = new Set();
-  const real = bookings.filter(b => !b.isBlocked);
+  const real = bookings.filter(bk => !bk.isBlocked);
+  console.log('[findTurnarounds] real bookings:', real.length);
   for (const a of real) {
-    for (const b of real) {
-      if (a.uid === b.uid) continue;
-      if (a.propertyId !== b.propertyId) continue;
-      // a checks out on the same day b checks in
-      if (a.end.getTime() === b.start.getTime()) {
-        turnarounds.add(a.end.toISOString().slice(0, 10));
+    for (const bk of real) {
+      if (a.uid === bk.uid) continue;
+      if (a.propertyId !== bk.propertyId) continue;
+      const aEnd   = a.end.toISOString().slice(0, 10);
+      const bkStart = bk.start.toISOString().slice(0, 10);
+      if (a.end.getTime() === bk.start.getTime()) {
+        console.log(`[findTurnarounds] match! ${a.summary} ends ${aEnd} = ${bk.summary} starts ${bkStart}`);
+        turnarounds.add(aEnd);
       }
     }
   }
-  return turnarounds; // Set of date strings "YYYY-MM-DD"
+  console.log('[findTurnarounds] result:', Array.from(turnarounds));
+  return turnarounds;
 }
 
 // ── iCal parsing ──────────────────────────────────────────────
@@ -182,52 +186,3 @@ function escHtml(s) {
 // A turnaround occurs when one booking ends on the same day
 // another begins. Returns a Set of date strings that are
 // turnaround days, and a Map of checkout->checkin booking pairs.
-
-function findTurnarounds(bookings) {
-  const real = bookings.filter(b => !b.isBlocked);
-  // Map checkout date string -> booking that ends that day
-  const checkoutMap = new Map();
-  // Map checkin date string -> booking that starts that day
-  const checkinMap  = new Map();
-
-  for (const b of real) {
-    const checkoutStr = b.end.toISOString().slice(0, 10);
-    const checkinStr  = b.start.toISOString().slice(0, 10);
-    checkoutMap.set(checkoutStr, b);
-    checkinMap.set(checkinStr, b);
-  }
-
-  // Find pairs where checkout date === checkin date (same-day turnaround)
-  // or checkout date + 1 === checkin date (next-day turnaround)
-  const turnaroundDays  = new Set(); // date strings that need turnaround
-  const turnaroundPairs = new Map(); // checkoutBookingUid -> { checkout, checkin, type }
-
-  for (const [dateStr, checkoutBooking] of checkoutMap) {
-    // Same-day turnaround
-    if (checkinMap.has(dateStr)) {
-      turnaroundDays.set ? turnaroundDays.add(dateStr) : null;
-      turnaroundDays.add(dateStr);
-      turnaroundPairs.set(checkoutBooking.uid, {
-        checkout: checkoutBooking,
-        checkin:  checkinMap.get(dateStr),
-        type:     'same-day',
-      });
-    } else {
-      // Check for next-day turnaround
-      const next = new Date(dateStr);
-      next.setDate(next.getDate() + 1);
-      const nextStr = next.toISOString().slice(0, 10);
-      if (checkinMap.has(nextStr)) {
-        turnaroundDays.add(dateStr);
-        turnaroundDays.add(nextStr);
-        turnaroundPairs.set(checkoutBooking.uid, {
-          checkout: checkoutBooking,
-          checkin:  checkinMap.get(nextStr),
-          type:     'back-to-back',
-        });
-      }
-    }
-  }
-
-  return { turnaroundDays, turnaroundPairs };
-}

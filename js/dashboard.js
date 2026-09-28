@@ -252,6 +252,7 @@ function renderBookings() {
   let html = '<div class="bookings-list">';
   let lastStatus = null;
   let blockedSectionShown = false;
+  const shownTurnarounds = new Set(); // prevent duplicate banners per day
 
   for (const b of sorted) {
     const status   = getStatus(b);
@@ -270,18 +271,20 @@ function renderBookings() {
       if (status === 'upcoming')     html += '<div class="section-label">Upcoming</div>';
       lastStatus = status;
     }
-    // Show turnaround banner before a checking-in booking when the
-    // previous booking checks out on the same day
-    const checkoutDateStr = b.start.toISOString().slice(0, 10);
-    if (!b.isBlocked && status !== 'past' && turnaroundDays instanceof Set && turnaroundDays.has(checkoutDateStr)) {
-      // Only show if there's a checkout on this same day (not just checkin)
-      const hasCheckout = sorted.some(other =>
+    // Show turnaround banner before the checking-in booking on a turnaround day
+    const startDateStr = b.start.toISOString().slice(0, 10);
+    if (!b.isBlocked && turnaroundDays instanceof Set && turnaroundDays.size > 0) {
+      console.log(`[turnaround] checking ${b.summary} start=${startDateStr} inSet=${turnaroundDays.has(startDateStr)} setContents=${[...turnaroundDays]}`);
+    }
+    if (!b.isBlocked && turnaroundDays instanceof Set && turnaroundDays.has(startDateStr)) {
+      // Confirm there's a checkout on this same day in allBookings (not just sorted)
+      const hasCheckout = allBookings.some(other =>
         !other.isBlocked &&
         other.uid !== b.uid &&
         other.propertyId === b.propertyId &&
-        other.end.toISOString().slice(0, 10) === checkoutDateStr
+        other.end.toISOString().slice(0, 10) === startDateStr
       );
-      if (hasCheckout && b.start.toISOString().slice(0, 10) === checkoutDateStr) {
+      if (hasCheckout) {
         html += `<div class="turnaround-banner">🔄 Turnaround day — clean and prepare before next guest</div>`;
       }
     }
@@ -430,7 +433,7 @@ function makeDemoBookings() {
     b('airbnb',     'Airbnb Guest',      20, 3, false, null, 2),
     b('booking',    'Booking.com Guest', 28, 6, false, null, 2),
     b('lekkeslaap', null, 18, 1, true,   null, 2),
-  ].sort((a, b) => a.start - b.start);
+  ].sort((x, y) => x.start - y.start);
 }
 
 let currentMode = 'live';
@@ -453,6 +456,12 @@ function setMode(mode) {
     turnaroundDays = new Set();
     allBookings = makeDemoBookings();
     turnaroundDays = findTurnarounds(allBookings);
+    console.log('[demo] allBookings count:', allBookings.length);
+    console.log('[demo] turnaroundDays:', Array.from(turnaroundDays));
+    console.log('[demo] sample starts/ends:', allBookings.slice(0,4).map(b => ({
+      name: b.summary, start: b.start.toISOString().slice(0,10),
+      end: b.end.toISOString().slice(0,10), pid: b.propertyId
+    })));
     document.getElementById('error-area').innerHTML = '';
     document.getElementById('last-updated').textContent = 'Demo data';
     updateStats();
