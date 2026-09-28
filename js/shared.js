@@ -54,6 +54,29 @@ function getStatus(b) {
   return 'active';
 }
 
+// ── Turnaround detection ─────────────────────────────────────
+// A turnaround day occurs when one booking ends and another begins
+// on the same day within the same property.
+function findTurnarounds(bookings) {
+  const turnarounds = new Set();
+  const real = bookings.filter(bk => !bk.isBlocked);
+  console.log('[findTurnarounds] real bookings:', real.length);
+  for (const a of real) {
+    for (const bk of real) {
+      if (a.uid === bk.uid) continue;
+      if (a.propertyId !== bk.propertyId) continue;
+      const aEnd   = a.end.toISOString().slice(0, 10);
+      const bkStart = bk.start.toISOString().slice(0, 10);
+      if (a.end.getTime() === bk.start.getTime()) {
+        console.log(`[findTurnarounds] match! ${a.summary} ends ${aEnd} = ${bk.summary} starts ${bkStart}`);
+        turnarounds.add(aEnd);
+      }
+    }
+  }
+  console.log('[findTurnarounds] result:', Array.from(turnarounds));
+  return turnarounds;
+}
+
 // ── iCal parsing ──────────────────────────────────────────────
 
 // Unfold iCal line continuations (CRLF or LF followed by space/tab)
@@ -158,3 +181,8 @@ function escHtml(s) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+// ── Turnaround detection ──────────────────────────────────────
+// A turnaround occurs when one booking ends on the same day
+// another begins. Returns a Set of date strings that are
+// turnaround days, and a Map of checkout->checkin booking pairs.
