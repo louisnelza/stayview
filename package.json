@@ -16,10 +16,13 @@
     "outputPath": "dist",
     "assets": [
       "index.html",
+      "book.html",
       "js/shared.js",
       "js/dashboard.js",
+      "js/booking.js",
       "css/shared.css",
-      "css/dashboard.css"
+      "css/dashboard.css",
+      "css/booking.css"
     ]
   },
   "engines": {

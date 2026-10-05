@@ -74,12 +74,27 @@ async function loadAll(force = false) {
     }
     try { localStorage.setItem('stayview_counts', JSON.stringify(updatedCounts)); } catch(e) {}
 
-    // Direct bookings fetch — enabled when booking engine is released
-    // try {
-    //   const directRes  = await fetch('/api/bookings');
-    //   const directData = await directRes.json();
-    //   directData.forEach(b => { allBookings.push({ ...b }); });
-    // } catch(e) { console.warn('Could not load direct bookings:', e); }
+    // Load direct bookings from server
+    try {
+      const directRes  = await fetch('/api/bookings');
+      const directData = await directRes.json();
+      directData.forEach(b => {
+        allBookings.push({
+          uid:       b.uid,
+          source:    'direct',
+          summary:   b.name,
+          start:     new Date(b.checkin  + 'T00:00:00'),
+          end:       new Date(b.checkout + 'T00:00:00'),
+          nights:    b.nights,
+          isBlocked: false,
+          details:   null,
+          propertyId: b.propertyId || 1,
+          status:    b.status,
+          email:     b.email,
+          phone:     b.phone,
+        });
+      });
+    } catch(e) { console.warn('Could not load direct bookings:', e); }
 
     allBookings.sort((a, b) => a.start - b.start);
     turnaroundDays = findTurnarounds(allBookings);
@@ -256,7 +271,7 @@ function renderBookings() {
 
   for (const b of sorted) {
     const status   = getStatus(b);
-    const isDirect = false; // b.source === 'direct' — enabled when booking engine is released
+    const isDirect = b.source === 'direct';
 
     // Show property name on card when viewing all properties
     const propName = currentProperty === 'all' && properties.length > 1
@@ -387,11 +402,38 @@ function changeMonth(dir) {
   renderCalendar();
 }
 
-// ── Delete booking — enabled when booking engine is released ──
-// let pendingDeleteUid = null;
-// function openDeleteModal(uid, name, checkin, checkout) { ... }
-// function closeDeleteModal() { ... }
-// async function confirmDelete() { ... }
+// ── Delete booking ────────────────────────────────────────────
+let pendingDeleteUid = null;
+
+function openDeleteModal(uid, name, checkin, checkout) {
+  pendingDeleteUid = uid;
+  document.getElementById('delete-modal-body').innerHTML =
+    `Are you sure you want to delete the direct booking for <strong>${name}</strong> (${checkin} → ${checkout})?<br><br>This cannot be undone.`;
+  document.getElementById('delete-modal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').style.display = 'none';
+  pendingDeleteUid = null;
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteUid) return;
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.textContent = 'Deleting…'; btn.disabled = true;
+  try {
+    const res  = await fetch('/api/bookings/' + encodeURIComponent(pendingDeleteUid), { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Delete failed');
+    closeDeleteModal();
+    allBookings = allBookings.filter(b => b.uid !== pendingDeleteUid);
+    turnaroundDays = findTurnarounds(allBookings);
+    updateStats(); renderBookings(); renderCalendar();
+  } catch(e) {
+    alert('Could not delete booking: ' + e.message);
+  }
+  btn.textContent = 'Delete'; btn.disabled = false;
+}
 
 // ── Demo mode ─────────────────────────────────────────────────
 
