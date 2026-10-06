@@ -425,8 +425,9 @@ async function confirmDelete() {
     const res  = await fetch('/api/bookings/' + encodeURIComponent(pendingDeleteUid), { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Delete failed');
+    const deletedUid = pendingDeleteUid;
     closeDeleteModal();
-    allBookings = allBookings.filter(b => b.uid !== pendingDeleteUid);
+    allBookings = allBookings.filter(b => b.uid !== deletedUid);
     turnaroundDays = findTurnarounds(allBookings);
     updateStats(); renderBookings(); renderCalendar();
   } catch(e) {
