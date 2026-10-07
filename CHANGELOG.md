@@ -5,16 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — feature/booking-engine
+## [1.3.0] — 2026-07-17
 
 ### Added
-- Direct booking engine — guest-facing `/book` page with availability check, pricing summary and booking form
-- Booking storage — direct bookings saved to `bookings.json` on the server
-- Booking API — `POST /api/book`, `GET /api/bookings`, `DELETE /api/bookings/:uid`
-- Availability API — `GET /api/availability` blocks dates from all iCal feeds for the booking form
-- Property config — `PROPERTY_NAME`, `PROPERTY_DESCRIPTION`, `PROPERTY_LOCATION`, `NIGHTLY_RATE`, `MIN_NIGHTS`, `MAX_GUESTS`, `PROPERTY_PHOTO_URL` in config
-- Delete direct bookings — ✕ button on direct booking cards with confirmation modal
-- Direct bookings shown in dashboard alongside platform bookings (purple colour)
+- **Direct booking engine** — guest-facing `/book` page with live availability calendar, pricing summary and booking request form. Cuts platform commissions entirely.
+- **Manual booking capture** — add bookings directly to `bookings.json` for phone/walk-in reservations. Format documented in README.
+- **Direct bookings in dashboard** — appear in purple alongside Airbnb, Booking.com and Lekkeslaap bookings with delete (✕) button and confirmation modal
+- **Turnaround day indicator** — amber banner between booking cards and dot on calendar when one guest checks out and another checks in on the same day, across all platforms — closes #39
+- **Platform downtime resilience** — per-source iCal cache persisted to `ical-cache.json`. When a platform is temporarily unavailable (e.g. HTTP 503), last known good data is served. Cache primer retries uncached sources every 5 minutes — closes #37
+- **Lekkeslaap provisional booking badge** — bookings without guest details are flagged as "Provisional" so hosts know not to rely on them — closes #30
+- **Booking engine API** — `GET /api/property`, `GET /api/availability`, `POST /api/book`, `GET /api/bookings`, `DELETE /api/bookings/:uid`
+
+### Fixed
+- Checkout day incorrectly showing as "Past" instead of "Checking Out" — `DTEND` is exclusive in iCal spec
+- Blocked dates appearing above "Upcoming" section label — hidden in upcoming view, grouped at bottom in "All" view — closes #32
+- `DELETE` method missing from CORS allowed headers — direct booking delete failed with "Failed to fetch"
+- Delete UI not updating after confirmation — `pendingDeleteUid` was cleared before filter ran
+- Variable shadowing in `findTurnarounds` and `makeDemoBookings` sort causing turnaround detection to silently fail
+- `turnaroundDays` TypeError in demo mode — reset to `new Set()` before computation
+
+### Changed
+- `bookings.json` added to `.gitignore` — never committed, contains guest data
+- `book.html`, `js/booking.js`, `css/booking.css` added to pkg assets for executable builds
+- Demo mode updated to show turnaround days between bookings
 
 ---
 
