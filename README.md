@@ -1,6 +1,6 @@
 # StayView — Rental Dashboard
 
-A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com**, **Lekkeslaap** and **Slaapstad** into one place. Accept direct bookings commission-free. Built with vanilla JS and a lightweight Node.js server — no framework, no database, no npm dependencies.
+A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com** and **Lekkeslaap** into one place. Accept direct bookings commission-free. Built with vanilla JS and a lightweight Node.js server — no framework, no database, no npm dependencies.
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://stayview.onrender.com)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -14,7 +14,7 @@ A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com*
 
 ## Features
 
-- **Multi-platform** — Airbnb, Booking.com, Lekkeslaap and Slaapstad iCal feeds in one view
+- **Multi-platform** — Airbnb, Booking.com and Lekkeslaap iCal feeds in one view
 - **Multi-property** — manage multiple rentals from one dashboard with a property switcher
 - **Direct booking engine** — guest-facing `/book` page so guests can book without platform commissions
 - **Manual booking capture** — add walk-in or phone bookings directly to the dashboard
@@ -116,7 +116,6 @@ Click **↻ Refresh** in the dashboard to load the new booking. Direct bookings 
 | **Airbnb** | Calendar → Availability settings → Export calendar |
 | **Booking.com** | Property → Calendar → Export calendar |
 | **Lekkeslaap** | Supplier dashboard → Calendar → iCal export |
-| **Slaapstad** | Property settings → Calendar sync → iCal URL |
 
 ## Deploying to a Raspberry Pi
 
