@@ -54,25 +54,48 @@ function getStatus(b) {
 }
 
 // ── Turnaround detection ─────────────────────────────────────
-// A turnaround day occurs when one booking ends and another begins
-// on the same day within the same property.
+// Returns a map of dates that need a turnaround/service reminder.
+// Three cases:
+//   1. Same-day swap — one booking ends, another starts same day
+//   2. Checkout day — any booking ending (unit always needs cleaning)
+//   3. Checkin after gap — a booking starts within GAP_DAYS of a
+//      previous booking ending (unit may need refreshing)
+const TURNAROUND_GAP_DAYS = 3;
+
 function findTurnarounds(bookings) {
-  const turnarounds = new Set();
+  // Returns a Map of dateStr -> { type: 'swap'|'checkout'|'checkin', propertyId }
+  const turnarounds = new Map();
   const real = bookings.filter(bk => !bk.isBlocked);
-  console.log('[findTurnarounds] real bookings:', real.length);
+
   for (const a of real) {
+    const aEndStr = a.end.toISOString().slice(0, 10);
+
+    // Case 1 & 2: Every checkout day needs a turnaround
+    if (!turnarounds.has(aEndStr)) {
+      turnarounds.set(aEndStr, { type: 'checkout', propertyId: a.propertyId });
+    }
+
+    // Check if another booking starts on the same day (upgrade to swap)
     for (const bk of real) {
       if (a.uid === bk.uid) continue;
       if (a.propertyId !== bk.propertyId) continue;
-      const aEnd   = a.end.toISOString().slice(0, 10);
-      const bkStart = bk.start.toISOString().slice(0, 10);
+      const bkStartStr = bk.start.toISOString().slice(0, 10);
+
       if (a.end.getTime() === bk.start.getTime()) {
-        console.log(`[findTurnarounds] match! ${a.summary} ends ${aEnd} = ${bk.summary} starts ${bkStart}`);
-        turnarounds.add(aEnd);
+        // Same-day swap — mark both checkout and checkin date (same date)
+        turnarounds.set(aEndStr, { type: 'swap', propertyId: a.propertyId });
+      } else {
+        // Case 3: Checkin within GAP_DAYS of a previous checkout
+        const gapMs = bk.start.getTime() - a.end.getTime();
+        const gapDays = gapMs / 86400000;
+        if (gapDays > 0 && gapDays <= TURNAROUND_GAP_DAYS) {
+          if (!turnarounds.has(bkStartStr)) {
+            turnarounds.set(bkStartStr, { type: 'checkin', propertyId: bk.propertyId });
+          }
+        }
       }
     }
   }
-  console.log('[findTurnarounds] result:', Array.from(turnarounds));
   return turnarounds;
 }
 

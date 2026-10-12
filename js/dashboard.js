@@ -13,7 +13,7 @@ let properties       = [];   // array of { id, name, location } from /config
 let currentProperty  = 'all'; // 'all' or property id (number)
 
 // ── Turnaround state ──────────────────────────────────────────
-let turnaroundDays   = new Set(); // Set of "YYYY-MM-DD" strings
+let turnaroundDays   = new Map(); // Map of dateStr -> { type, propertyId }
 
 // ── Auto-refresh ──────────────────────────────────────────────
 let pollInterval    = null;   // setInterval handle
@@ -286,21 +286,22 @@ function renderBookings() {
       if (status === 'upcoming')     html += '<div class="section-label">Upcoming</div>';
       lastStatus = status;
     }
-    // Show turnaround banner before the checking-in booking on a turnaround day
-    const startDateStr = b.start.toISOString().slice(0, 10);
-    if (!b.isBlocked && turnaroundDays instanceof Set && turnaroundDays.size > 0) {
-      console.log(`[turnaround] checking ${b.summary} start=${startDateStr} inSet=${turnaroundDays.has(startDateStr)} setContents=${[...turnaroundDays]}`);
-    }
-    if (!b.isBlocked && turnaroundDays instanceof Set && turnaroundDays.has(startDateStr)) {
-      // Confirm there's a checkout on this same day in allBookings (not just sorted)
-      const hasCheckout = allBookings.some(other =>
-        !other.isBlocked &&
-        other.uid !== b.uid &&
-        other.propertyId === b.propertyId &&
-        other.end.toISOString().slice(0, 10) === startDateStr
-      );
-      if (hasCheckout) {
-        html += `<div class="turnaround-banner">🔄 Turnaround day — clean and prepare before next guest</div>`;
+    // Show turnaround banners based on booking status and turnaround map
+    if (!b.isBlocked && turnaroundDays instanceof Map) {
+      const checkoutDateStr = b.end.toISOString().slice(0, 10);
+      const checkinDateStr  = b.start.toISOString().slice(0, 10);
+      const checkoutEntry   = turnaroundDays.get(checkoutDateStr);
+      const checkinEntry    = turnaroundDays.get(checkinDateStr);
+      // After checkout card — unit needs cleaning
+      if (status === 'checking-out' && checkoutEntry) {
+        const msg = checkoutEntry.type === 'swap'
+          ? '🔄 Same-day turnaround — guest checking out, new guest arriving today'
+          : '🧹 Checkout today — clean and prepare the unit';
+        html += `<div class="turnaround-banner">${msg}</div>`;
+      }
+      // Before checkin card after a gap — remind host to check unit is ready
+      if (status === 'checking-in' && checkinEntry && checkinEntry.type === 'checkin') {
+        html += `<div class="turnaround-banner">🛏️ New guest arriving — confirm unit is serviced and ready</div>`;
       }
     }
 
@@ -384,7 +385,7 @@ function renderCalendar() {
       : allBookings.filter(b => b.propertyId === currentProperty);
     const matching = calBookings.filter(b => b.start <= date && b.end > date);
     const dateStr = date.toISOString().slice(0, 10);
-    const isTurnaround = turnaroundDays instanceof Set && turnaroundDays.has(dateStr);
+    const isTurnaround = turnaroundDays instanceof Map && turnaroundDays.has(dateStr);
     if (isTurnaround) el.classList.add('turnaround');
     if (matching.length > 0) {
       const srcs = [...new Set(matching.map(b => b.isBlocked ? 'blocked' : b.source))];
@@ -460,19 +461,19 @@ function makeDemoBookings() {
   });
   return [
     // Property 1 — Scottburgh Beach House
-    b('lekkeslaap', 'Mia Pretorius',     -3, 3, false, ls('LS-DEMO05', 'Mia Pretorius',    'mia@example.co.za',    '+27845556666'), 1), // checks out today → turnaround!
-    b('airbnb',     'Airbnb Guest',       0, 5, false, null, 1),                                                                          // checks in today → turnaround!
-    b('lekkeslaap', 'Pieter van Wyk',     5, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',   'pieter@example.co.za', '+27821234567'), 1),
-    b('booking',    'Booking.com Guest',  8, 2, false, null, 1),
-    b('airbnb',     'Airbnb Guest',      10, 5, false, null, 1),
-    b('lekkeslaap', 'Anri Botha',        15, 7, false, ls('LS-DEMO02', 'Anri Botha',       'anri@example.co.za',   '+27839876543'), 1),
-    b('booking',    'Booking.com Guest', 22, 3, false, null, 1),
-    b('lekkeslaap', 'Kobus Joubert',     28, 2, false, ls('LS-DEMO03', 'Kobus Joubert',    'kobus@example.co.za',  '+27711112222'), 1),
+    b('lekkeslaap', 'Mia Pretorius',     -3, 3, false, ls('LS-DEMO05', 'Mia Pretorius',    'mia@example.co.za',    '+27845556666'), 1), // checks out today → same-day swap turnaround
+    b('airbnb',     'Airbnb Guest',       0, 5, false, null, 1),                                                                          // checks in today → same-day swap
+    b('lekkeslaap', 'Pieter van Wyk',     5, 3, false, ls('LS-DEMO01', 'Pieter van Wyk',   'pieter@example.co.za', '+27821234567'), 1),   // checks out day 8 → checkout only
+    b('booking',    'Booking.com Guest', 10, 2, false, null, 1),                                                                          // checks in day 10 → checkin after gap
+    b('airbnb',     'Airbnb Guest',      14, 5, false, null, 1),
+    b('lekkeslaap', 'Anri Botha',        19, 7, false, ls('LS-DEMO02', 'Anri Botha',       'anri@example.co.za',   '+27839876543'), 1),
+    b('booking',    'Booking.com Guest', 26, 3, false, null, 1),
+    b('lekkeslaap', 'Kobus Joubert',     32, 2, false, ls('LS-DEMO03', 'Kobus Joubert',    'kobus@example.co.za',  '+27711112222'), 1),
     b('airbnb',     null,  6, 2, true,   null, 1),
     // Property 2 — Durban City Apartment
     b('airbnb',     'Airbnb Guest',       1, 3, false, null, 2),
-    b('booking',    'Booking.com Guest',  4, 4, false, null, 2), // checks out day 4 → turnaround!
-    b('lekkeslaap', 'Sarel du Plessis',   8, 5, false, ls('LS-DEMO04', 'Sarel du Plessis', 'sarel@example.co.za',  '+27723334444'), 2), // checks in day 4 → turnaround!
+    b('booking',    'Booking.com Guest',  4, 4, false, null, 2), // checks out day 4 → same-day swap
+    b('lekkeslaap', 'Sarel du Plessis',   4, 5, false, ls('LS-DEMO04', 'Sarel du Plessis', 'sarel@example.co.za',  '+27723334444'), 2), // checks in day 4 → same-day swap
     b('airbnb',     'Airbnb Guest',      20, 3, false, null, 2),
     b('booking',    'Booking.com Guest', 28, 6, false, null, 2),
     b('lekkeslaap', null, 18, 1, true,   null, 2),
@@ -496,11 +497,11 @@ function setMode(mode) {
     }
     stopPolling();
     currentProperty = 'all';
-    turnaroundDays = new Set();
+    turnaroundDays = new Map();
     allBookings = makeDemoBookings();
     turnaroundDays = findTurnarounds(allBookings);
     console.log('[demo] allBookings count:', allBookings.length);
-    console.log('[demo] turnaroundDays:', Array.from(turnaroundDays));
+    console.log('[demo] turnaroundDays:', [...turnaroundDays.keys()]);
     console.log('[demo] sample starts/ends:', allBookings.slice(0,4).map(b => ({
       name: b.summary, start: b.start.toISOString().slice(0,10),
       end: b.end.toISOString().slice(0,10), pid: b.propertyId
