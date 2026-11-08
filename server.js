@@ -2,7 +2,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const { parseIcal, localYmd, parseYmd, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
+const { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
 const { KnownUidStore } = require("./booking-diff.js");
 
 // ── Config loading ───────────────────────────────────────────
@@ -428,8 +428,7 @@ function parseIcalDates(text) {
     const get = k => { const m = ev.match(new RegExp(k + "[^:]*:([^\r\n]+)")); return m ? m[1].trim() : ""; };
     const dtstart = get("DTSTART"), dtend = get("DTEND");
     if (!dtstart || !dtend) continue;
-    const parseD = s => { const c = s.replace(/T.*/,""); return new Date(+c.slice(0,4), +c.slice(4,6)-1, +c.slice(6,8)); };
-    const start = parseD(dtstart), end = parseD(dtend);
+    const start = parseDate(dtstart), end = parseDate(dtend);
     if (isNaN(start) || isNaN(end)) continue;
     for (let d = new Date(start); d < end; d.setDate(d.getDate()+1)) {
       blocked.push(localYmd(d));
@@ -664,13 +663,18 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: "Missing required fields" }));
         return;
       }
-      const start = parseYmd(checkin), end = parseYmd(checkout);
-      if (isNaN(start) || isNaN(end) || end <= start) {
+      if (!isValidYmd(checkin) || !isValidYmd(checkout)) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid dates" }));
         return;
       }
-      const nights = Math.round((end - start) / 86400000);
+      const start = parseYmd(checkin), end = parseYmd(checkout);
+      if (end <= start) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid dates" }));
+        return;
+      }
+      const nights = nightsBetween(start, end);
       const cfg = getPropertyConfig();
       const booking = {
         uid: "direct-" + Date.now(),

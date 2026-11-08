@@ -38,10 +38,29 @@ function parseYmd(s) {
   return new Date(s + 'T00:00:00');
 }
 
+// True only for a real calendar date in strict YYYY-MM-DD form.
+// Rejects impossible dates like 2026-02-30, which Date would
+// otherwise roll forward to 2 March.
+function isValidYmd(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = parseYmd(s);
+  return !isNaN(d) && localYmd(d) === s;
+}
+
+// Parse an iCal DTSTART/DTEND value to local midnight of its day.
+//   20261110 / 2026-11-10    date-only: that calendar day
+//   20261110T140000          floating or TZID local time: that day
+//   20261110T230000Z         UTC instant: the local day it falls on
+// Anything else returns an Invalid Date so the event is skipped.
 function parseDate(s) {
-  const c = s.replace(/T.*/, '');
-  if (c.length === 8) return new Date(+c.slice(0,4), +c.slice(4,6)-1, +c.slice(6,8));
-  return new Date(s);
+  const m = s.match(/^(\d{4})-?(\d{2})-?(\d{2})(?:T(\d{2}):?(\d{2}):?(\d{2})(Z)?)?/);
+  if (!m) return new Date(NaN);
+  const [, y, mo, d, h, mi, sec, utc] = m;
+  if (utc) {
+    const t = new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +sec));
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }
+  return new Date(+y, +mo - 1, +d);
 }
 
 function fmtShort(d) {
@@ -101,8 +120,8 @@ function findTurnarounds(bookings) {
         turnarounds.set(aEndStr, { type: 'swap', propertyId: a.propertyId });
       } else {
         // Case 3: Checkin within GAP_DAYS of a previous checkout
-        const gapMs = bk.start.getTime() - a.end.getTime();
-        const gapDays = gapMs / 86400000;
+        // Round so a gap spanning a DST change still counts as whole days
+        const gapDays = nightsBetween(a.end, bk.start);
         if (gapDays > 0 && gapDays <= TURNAROUND_GAP_DAYS) {
           if (!turnarounds.has(bkStartStr)) {
             turnarounds.set(bkStartStr, { type: 'checkin', propertyId: bk.propertyId });
@@ -226,5 +245,5 @@ function escHtml(s) {
 // ── Node export ───────────────────────────────────────────────
 // Lets server.js reuse the iCal parser. No-op in the browser.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseIcal, parseDate, localYmd, parseYmd, nightsBetween, fmtFull, SOURCE_LABELS };
+  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS };
 }
