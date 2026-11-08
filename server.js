@@ -2,6 +2,8 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const { parseIcal, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
+const { KnownUidStore } = require("./booking-diff.js");
 
 // ── Config loading ───────────────────────────────────────────
 // Two config formats are supported intentionally:
@@ -202,6 +204,54 @@ function buildCachedResults() {
 // Load cache from disk on startup
 loadDiskCache();
 
+// ── New booking detection ────────────────────────────────────
+// Every fresh (non-stale) fetch is diffed against known-uids.json.
+const knownUids = new KnownUidStore(path.join(getBaseDir(), "known-uids.json"));
+
+function detectBookingChanges(property, source, text) {
+  const sourceKey = `${property.id}:${source}`;
+  let bookings;
+  try {
+    bookings = parseIcal(text, source, property.id);
+  } catch(e) {
+    console.warn(`  [diff] ${sourceKey} could not parse feed: ${e.message}`);
+    return;
+  }
+  const result = knownUids.update(sourceKey, bookings);
+  if (result.baseline) {
+    console.log(`  [diff] ${sourceKey} baseline set — ${result.next.length} UID${result.next.length !== 1 ? 's' : ''} known`);
+    return;
+  }
+  if (result.skipped) {
+    console.warn(`  [diff] ${sourceKey} feed returned no events — keeping known UIDs (possible platform glitch)`);
+    return;
+  }
+  result.removed.forEach(uid => console.log(`  [diff] ${sourceKey} UID no longer in feed: ${uid}`));
+  if (result.added.length > 0) handleNewBookings(property, source, result.added);
+}
+
+// Notification senders (Telegram, ntfy, email — #54–#57) hook in here.
+function handleNewBookings(property, source, bookings) {
+  const label = SOURCE_LABELS[source] || source;
+  for (const b of bookings) {
+    console.log(`  [diff] New ${label} booking — ${property.name}: ${b.summary}, ` +
+      `${fmtFull(b.start)} → ${fmtFull(b.end)} (${b.nights} night${b.nights !== 1 ? 's' : ''})`);
+  }
+}
+
+// Store a successful fetch in the cache and check it for new bookings
+function cacheFreshSource(property, name, text) {
+  const result = {
+    name, propertyId: property.id, success: true,
+    data: text, error: null,
+    empty: !text.includes('BEGIN:VEVENT'), stale: false,
+  };
+  serverSourceCache[`${property.id}:${name}`] = { result, fetchedAt: new Date() };
+  saveDiskCache();
+  detectBookingChanges(property, name, text);
+  return result;
+}
+
 async function fetchPropertySources(property) {
   const entries = Object.entries(property.sources).filter(([, u]) => u);
   return Promise.all(entries.map(async ([name, srcUrl]) => {
@@ -209,7 +259,6 @@ async function fetchPropertySources(property) {
     try {
       const text = await fetchUrl(srcUrl);
       const hasCalendar = text.includes('BEGIN:VCALENDAR');
-      const hasEvents   = text.includes('BEGIN:VEVENT');
       if (!hasCalendar) {
         console.log(`  [P${property.id}:${name}] INVALID — no VCALENDAR`);
         // Don't update cache — keep last known good data
@@ -220,9 +269,7 @@ async function fetchPropertySources(property) {
         }
         return { name, propertyId: property.id, success: false, data: '', error: 'No VCALENDAR' };
       }
-      const result = { name, propertyId: property.id, success: true, data: text, error: null, empty: !hasEvents, stale: false };
-      serverSourceCache[cacheKey] = { result, fetchedAt: new Date() };
-      saveDiskCache();
+      const result = cacheFreshSource(property, name, text);
       console.log(`  [P${property.id}:${name}] OK (${text.length} chars)`);
       return result;
     } catch(e) {
@@ -285,18 +332,12 @@ function startCachePrimer() {
       return;
     }
     console.log(`[cache] Retrying ${uncached.length} uncached source${uncached.length > 1 ? 's' : ''}...`);
-    await Promise.all(uncached.map(async ({ prop, name, url, key }) => {
+    await Promise.all(uncached.map(async ({ prop, name, url }) => {
       try {
         const text = await fetchUrl(url);
         const hasCalendar = text.includes('BEGIN:VCALENDAR');
         if (!hasCalendar) { console.log(`  [${name}] retry: invalid iCal`); return; }
-        const result = {
-          name, propertyId: prop.id, success: true,
-          data: text, error: null,
-          empty: !text.includes('BEGIN:VEVENT'), stale: false,
-        };
-        serverSourceCache[key] = { result, fetchedAt: new Date() };
-        saveDiskCache();
+        cacheFreshSource(prop, name, text);
         console.log(`  [${name}] retry: cached successfully`);
       } catch(e) {
         console.log(`  [${name}] retry: still failing — ${e.message}`);

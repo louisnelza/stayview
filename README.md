@@ -168,6 +168,7 @@ These files are created automatically and are listed in `.gitignore`:
 | `config.txt` | Same as `.env` but for executable users |
 | `bookings.json` | Direct bookings made through `/book` or manually added |
 | `ical-cache.json` | Cached iCal data — serves stale data during platform outages |
+| `known-uids.json` | Booking UIDs already seen per source — used to detect new bookings |
 
 ## Stack
 
