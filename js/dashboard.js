@@ -83,8 +83,8 @@ async function loadAll(force = false) {
           uid:       b.uid,
           source:    'direct',
           summary:   b.name,
-          start:     new Date(b.checkin  + 'T00:00:00'),
-          end:       new Date(b.checkout + 'T00:00:00'),
+          start:     parseYmd(b.checkin),
+          end:       parseYmd(b.checkout),
           nights:    b.nights,
           isBlocked: false,
           details:   null,
@@ -288,8 +288,8 @@ function renderBookings() {
     }
     // Show turnaround banners based on booking status and turnaround map
     if (!b.isBlocked && turnaroundDays instanceof Map) {
-      const checkoutDateStr = b.end.toISOString().slice(0, 10);
-      const checkinDateStr  = b.start.toISOString().slice(0, 10);
+      const checkoutDateStr = localYmd(b.end);
+      const checkinDateStr  = localYmd(b.start);
       const checkoutEntry   = turnaroundDays.get(checkoutDateStr);
       const checkinEntry    = turnaroundDays.get(checkinDateStr);
       // After checkout card — unit needs cleaning
@@ -384,7 +384,7 @@ function renderCalendar() {
       ? allBookings
       : allBookings.filter(b => b.propertyId === currentProperty);
     const matching = calBookings.filter(b => b.start <= date && b.end > date);
-    const dateStr = date.toISOString().slice(0, 10);
+    const dateStr = localYmd(date);
     const isTurnaround = turnaroundDays instanceof Map && turnaroundDays.has(dateStr);
     if (isTurnaround) el.classList.add('turnaround');
     if (matching.length > 0) {
@@ -503,8 +503,8 @@ function setMode(mode) {
     console.log('[demo] allBookings count:', allBookings.length);
     console.log('[demo] turnaroundDays:', [...turnaroundDays.keys()]);
     console.log('[demo] sample starts/ends:', allBookings.slice(0,4).map(b => ({
-      name: b.summary, start: b.start.toISOString().slice(0,10),
-      end: b.end.toISOString().slice(0,10), pid: b.propertyId
+      name: b.summary, start: localYmd(b.start),
+      end: localYmd(b.end), pid: b.propertyId
     })));
     document.getElementById('error-area').innerHTML = '';
     document.getElementById('last-updated').textContent = 'Demo data';

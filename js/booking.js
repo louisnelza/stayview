@@ -44,7 +44,7 @@ async function init() {
     }
 
     // Date constraints
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = localYmd(new Date());
     document.getElementById('checkin').min  = todayStr;
     document.getElementById('checkout').min = todayStr;
 
@@ -75,10 +75,10 @@ function isDateBlocked(dateStr) {
 
 function datesInRange(checkin, checkout) {
   const dates = [];
-  let d = new Date(checkin + 'T00:00:00');
-  const end = new Date(checkout + 'T00:00:00');
+  let d = parseYmd(checkin);
+  const end = parseYmd(checkout);
   while (d < end) {
-    dates.push(d.toISOString().slice(0, 10));
+    dates.push(localYmd(d));
     d.setDate(d.getDate() + 1);
   }
   return dates;
@@ -89,9 +89,9 @@ function onDatesChange() {
 
   // Enforce min checkout = checkin + min_nights
   if (checkin) {
-    const minCheckout = new Date(checkin + 'T00:00:00');
+    const minCheckout = parseYmd(checkin);
     minCheckout.setDate(minCheckout.getDate() + (property.min_nights || 1));
-    const minStr = minCheckout.toISOString().slice(0, 10);
+    const minStr = localYmd(minCheckout);
     document.getElementById('checkout').min = minStr;
     const checkout = document.getElementById('checkout').value;
     if (checkout && checkout <= checkin) {
@@ -120,8 +120,8 @@ function checkAvailability() {
   }
 
   const nights = nightsBetween(
-    new Date(checkin  + 'T00:00:00'),
-    new Date(checkout + 'T00:00:00')
+    parseYmd(checkin),
+    parseYmd(checkout)
   );
 
   if (property.min_nights && nights < property.min_nights) {
@@ -162,8 +162,8 @@ function updateSummary() {
   }
 
   const nights = nightsBetween(
-    new Date(checkin  + 'T00:00:00'),
-    new Date(checkout + 'T00:00:00')
+    parseYmd(checkin),
+    parseYmd(checkout)
   );
   empty.style.display = 'none';
 
