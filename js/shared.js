@@ -208,3 +208,8 @@ function escHtml(s) {
 // A turnaround occurs when one booking ends on the same day
 // another begins. Returns a Set of date strings that are
 // turnaround days, and a Map of checkout->checkin booking pairs.
+// ── Node export ───────────────────────────────────────────────
+// Lets server.js reuse the iCal parser. No-op in the browser.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { parseIcal, parseDate, nightsBetween, fmtFull, SOURCE_LABELS };
+}
