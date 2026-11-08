@@ -360,6 +360,7 @@ function fetchUrl(targetUrl, redirectCount = 0) {
     const parsed = new URL(targetUrl);
     const options = {
       hostname: parsed.hostname,
+      port: parsed.port || 443,
       path: parsed.pathname + parsed.search,
       headers: HEADERS,
       timeout: 15000,
@@ -367,9 +368,8 @@ function fetchUrl(targetUrl, redirectCount = 0) {
     https.get(options, (res) => {
       console.log(`  [${parsed.hostname}] HTTP ${res.statusCode}`);
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const location = res.headers.location.startsWith("http")
-          ? res.headers.location
-          : `${parsed.protocol}//${parsed.hostname}${res.headers.location}`;
+        // Resolve relative redirects against the current URL (keeps host and port)
+        const location = new URL(res.headers.location, targetUrl).href;
         res.resume();
         return fetchUrl(location, redirectCount + 1).then(resolve).catch(reject);
       }
