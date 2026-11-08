@@ -21,11 +21,7 @@
 //     doesn't report every booking as new.
 
 const fs = require("fs");
-
-function localYmd(d) {
-  const pad = n => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+const { localYmd } = require("./js/shared.js");
 
 // Some feeds omit UID — fall back to a stable key from dates + summary
 function bookingKey(b) {

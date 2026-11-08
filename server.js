@@ -2,7 +2,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const { parseIcal, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
+const { parseIcal, localYmd, parseYmd, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
 const { KnownUidStore } = require("./booking-diff.js");
 
 // ── Config loading ───────────────────────────────────────────
@@ -432,7 +432,7 @@ function parseIcalDates(text) {
     const start = parseD(dtstart), end = parseD(dtend);
     if (isNaN(start) || isNaN(end)) continue;
     for (let d = new Date(start); d < end; d.setDate(d.getDate()+1)) {
-      blocked.push(d.toISOString().slice(0,10));
+      blocked.push(localYmd(d));
     }
   }
   return blocked;
@@ -645,9 +645,9 @@ const server = http.createServer(async (req, res) => {
     }));
     // Add direct bookings
     loadBookings().forEach(b => {
-      let d = new Date(b.checkin);
-      const end = new Date(b.checkout);
-      while (d < end) { blockedDates.add(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+      const d = parseYmd(b.checkin);
+      const end = parseYmd(b.checkout);
+      while (d < end) { blockedDates.add(localYmd(d)); d.setDate(d.getDate()+1); }
     });
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ blocked: [...blockedDates] }));
@@ -664,7 +664,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: "Missing required fields" }));
         return;
       }
-      const start = new Date(checkin), end = new Date(checkout);
+      const start = parseYmd(checkin), end = parseYmd(checkout);
       if (isNaN(start) || isNaN(end) || end <= start) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid dates" }));

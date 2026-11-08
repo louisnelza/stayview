@@ -23,6 +23,21 @@ function today() {
   return d;
 }
 
+// Format a Date as a local calendar date (YYYY-MM-DD). Never use
+// toISOString() for this — it converts to UTC and shifts the date
+// back a day in UTC+ timezones.
+function localYmd(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Parse a YYYY-MM-DD string as local midnight. new Date('YYYY-MM-DD')
+// parses as UTC midnight, which is the wrong day in UTC- timezones
+// and not local midnight in UTC+ ones.
+function parseYmd(s) {
+  return new Date(s + 'T00:00:00');
+}
+
 function parseDate(s) {
   const c = s.replace(/T.*/, '');
   if (c.length === 8) return new Date(+c.slice(0,4), +c.slice(4,6)-1, +c.slice(6,8));
@@ -68,7 +83,7 @@ function findTurnarounds(bookings) {
   const real = bookings.filter(bk => !bk.isBlocked);
 
   for (const a of real) {
-    const aEndStr = a.end.toISOString().slice(0, 10);
+    const aEndStr = localYmd(a.end);
 
     // Case 1 & 2: Every checkout day needs a turnaround
     if (!turnarounds.has(aEndStr)) {
@@ -79,7 +94,7 @@ function findTurnarounds(bookings) {
     for (const bk of real) {
       if (a.uid === bk.uid) continue;
       if (a.propertyId !== bk.propertyId) continue;
-      const bkStartStr = bk.start.toISOString().slice(0, 10);
+      const bkStartStr = localYmd(bk.start);
 
       if (a.end.getTime() === bk.start.getTime()) {
         // Same-day swap — mark both checkout and checkin date (same date)
@@ -211,5 +226,5 @@ function escHtml(s) {
 // ── Node export ───────────────────────────────────────────────
 // Lets server.js reuse the iCal parser. No-op in the browser.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseIcal, parseDate, nightsBetween, fmtFull, SOURCE_LABELS };
+  module.exports = { parseIcal, parseDate, localYmd, parseYmd, nightsBetween, fmtFull, SOURCE_LABELS };
 }
