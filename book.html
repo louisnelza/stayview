@@ -3,127 +3,183 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16233b">
 <title>Book Direct</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23090d10'/%3E%3Cpath d='M8 19a8 8 0 0 1 16 0' fill='%23f0e4c9'/%3E%3Cpath d='M5 23.5h22' stroke='%23f0e4c9' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/shared.css">
 <link rel="stylesheet" href="/css/booking.css">
 </head>
 <body>
 
-<header>
-  <span class="prop-name" id="prop-name">Loading…</span>
-  <a href="/" class="back-link">← Back to dashboard</a>
-</header>
-
 <div class="hero" id="hero">
-  <div class="hero-placeholder" id="hero-placeholder">
-    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1">
-      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-      <polyline points="9 22 9 12 15 12 15 22"/>
-    </svg>
-  </div>
+  <!-- Shown until a property photo is configured: first light over the sea -->
+  <svg class="hero-art" id="hero-placeholder" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#16233b"/>
+        <stop offset=".34" stop-color="#3d3a5c"/>
+        <stop offset=".62" stop-color="#a8606a"/>
+        <stop offset=".84" stop-color="#ee9a66"/>
+        <stop offset="1" stop-color="#fbd49a"/>
+      </linearGradient>
+      <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#b9736a"/>
+        <stop offset=".12" stop-color="#5d5a78"/>
+        <stop offset=".5" stop-color="#22405a"/>
+        <stop offset="1" stop-color="#0d1f2e"/>
+      </linearGradient>
+      <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+        <stop offset="0" stop-color="#fff1cf" stop-opacity=".95"/>
+        <stop offset=".35" stop-color="#ffc98a" stop-opacity=".5"/>
+        <stop offset="1" stop-color="#ffb070" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff6de"/>
+        <stop offset="1" stop-color="#ffcf8f"/>
+      </linearGradient>
+      <clipPath id="above"><rect width="1440" height="330"/></clipPath>
+    </defs>
+    <g transform="translate(0 -52)">
+    <rect width="1440" height="330" fill="url(#sky)"/>
+    <g clip-path="url(#above)">
+      <circle cx="1010" cy="322" r="330" fill="url(#glow)"/>
+      <circle cx="1010" cy="322" r="74" fill="url(#sun)"/>
+    </g>
+    <g fill="#f7d9c0" opacity=".16">
+      <rect x="160" y="150" width="420" height="5" rx="2.5"/>
+      <rect x="250" y="172" width="260" height="4" rx="2"/>
+      <rect x="1120" y="110" width="300" height="5" rx="2.5"/>
+      <rect x="640" y="214" width="200" height="3" rx="1.5"/>
+    </g>
+    <path d="M0 330V296c70-8 120-34 190-38 60-3 96 22 150 30 48 7 90 18 130 42z" fill="#2c2f4c"/>
+    <path d="M0 330v-16c60-4 110-20 170-18 70 2 120 22 200 34z" fill="#1d2640"/>
+    <rect y="330" width="1440" height="290" fill="url(#sea)"/>
+    <g fill="#ffe2b0">
+      <rect x="930" y="336" width="160" height="4" rx="2" opacity=".8"/>
+      <rect x="950" y="350" width="120" height="4" rx="2" opacity=".62"/>
+      <rect x="914" y="366" width="192" height="5" rx="2.5" opacity=".46"/>
+      <rect x="962" y="384" width="96" height="5" rx="2.5" opacity=".36"/>
+      <rect x="936" y="404" width="150" height="6" rx="3" opacity=".26"/>
+      <rect x="976" y="428" width="70" height="6" rx="3" opacity=".18"/>
+      <rect x="948" y="456" width="126" height="7" rx="3.5" opacity=".1"/>
+    </g>
+    <g fill="#fff" opacity=".07">
+      <rect x="120" y="372" width="300" height="3" rx="1.5"/>
+      <rect x="520" y="412" width="240" height="3" rx="1.5"/>
+      <rect x="1180" y="390" width="220" height="3" rx="1.5"/>
+      <rect x="300" y="470" width="360" height="4" rx="2"/>
+    </g>
+    <path d="M0 560V470c120-34 260-44 420-22 180 25 300 70 480 74 190 4 340-30 540-22v60z" fill="#0b1722"/>
+    <rect y="556" width="1440" height="64" fill="#0b1722"/>
+    </g>
+  </svg>
   <div class="hero-overlay"></div>
+
+  <header>
+    <span class="prop-name" id="prop-name">Loading…</span>
+    <a href="/" class="back-link">← Dashboard</a>
+  </header>
+
   <div class="hero-text">
+    <div class="hero-eyebrow">Book direct</div>
     <h1 id="hero-title"></h1>
     <p id="hero-location"></p>
   </div>
 </div>
 
-<div class="page">
-  <!-- Left column -->
-  <div>
-    <div class="card">
-      <div class="card-title">About this property</div>
-      <p class="prop-desc" id="prop-desc">Loading…</p>
-      <div class="prop-location" id="prop-location" style="display:none">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
-          <circle cx="12" cy="10" r="3"/>
-        </svg>
-        <span id="prop-location-text"></span>
-      </div>
-    </div>
+<main class="page" id="page">
+  <section class="intro">
+    <p class="prop-desc" id="prop-desc">Loading…</p>
+    <ul class="facts" id="facts"></ul>
+  </section>
 
-    <div class="card">
-      <div class="steps">
-        <div class="step active" id="step1"></div>
-        <div class="step" id="step2"></div>
-        <div class="step" id="step3"></div>
-      </div>
-      <div class="card-title">Check availability</div>
-      <div class="date-row">
-        <div class="field">
-          <label>Check-in</label>
-          <input type="date" id="checkin" onchange="onDatesChange()">
-        </div>
-        <div class="field">
-          <label>Check-out</label>
-          <input type="date" id="checkout" onchange="onDatesChange()">
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:14px">
-        <label>Guests</label>
-        <select id="guests" onchange="updateSummary()"></select>
-      </div>
-      <div class="avail-msg" id="avail-msg"></div>
-
-      <div id="guest-form" style="display:none">
-        <hr class="divider">
-        <div class="section-label">Your details</div>
-        <div class="form-grid">
-          <div class="field">
-            <label>First &amp; last name *</label>
-            <input type="text" id="g-name" placeholder="Jane Smith">
-          </div>
-          <div class="field">
-            <label>Email *</label>
-            <input type="email" id="g-email" placeholder="jane@email.com">
-          </div>
-          <div class="field">
-            <label>Phone</label>
-            <input type="tel" id="g-phone" placeholder="+27 82 000 0000">
-          </div>
-          <div class="field full">
-            <label>Message to host (optional)</label>
-            <textarea id="g-message" placeholder="Any special requests or questions…"></textarea>
-          </div>
-        </div>
-        <div class="error-msg" id="form-error"></div>
-        <button class="submit-btn" id="submit-btn" onclick="submitBooking()">Request Booking</button>
-        <p style="font-size:12px;color:var(--text3);margin-top:10px;text-align:center">
-          Your booking request will be sent to the host for confirmation.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right column -->
-  <div class="summary-card">
-    <div class="card">
+  <aside class="summary-card">
+    <div class="card reserve">
       <div class="rate-display" id="rate-display" style="display:none"></div>
-      <p class="summary-empty" id="summary-empty">Select your dates to see pricing and availability.</p>
+      <div class="date-cells">
+        <div class="date-cell"><span class="cell-label">Check-in</span><span class="cell-value empty" id="sum-in">Add date</span></div>
+        <div class="date-cell"><span class="cell-label">Check-out</span><span class="cell-value empty" id="sum-out">Add date</span></div>
+      </div>
+      <div class="guest-row">
+        <span class="cell-label" id="guests-label">Guests</span>
+        <div class="stepper" role="group" aria-labelledby="guests-label">
+          <button type="button" id="guests-minus" aria-label="Fewer guests">−</button>
+          <output id="guests-out" aria-live="polite">2</output>
+          <button type="button" id="guests-plus" aria-label="More guests">+</button>
+        </div>
+      </div>
+      <p class="summary-empty" id="summary-empty">Choose your dates to see the total.</p>
       <div class="summary-lines" id="summary-lines" style="display:none">
         <div class="summary-line"><span id="sl-nights"></span><span id="sl-rate"></span></div>
         <div class="summary-line total"><span>Total</span><span id="sl-total"></span></div>
       </div>
+      <p class="reserve-note">You won’t be charged now. The host confirms every request by email.</p>
     </div>
-    <div class="card" style="margin-top:12px">
-      <div style="font-size:13px;color:var(--text2);line-height:1.7">
-        <strong style="color:var(--text);display:block;margin-bottom:6px">Book direct and save</strong>
-        No platform fees. Your payment goes directly to the host.
+    <ul class="perks">
+      <li><b>No platform fees</b>Your payment goes straight to the host.</li>
+      <li><b>A direct line</b>Questions go to the person who knows the place.</li>
+    </ul>
+  </aside>
+
+  <section class="card" id="dates-card">
+    <div class="card-head">
+      <h2 class="card-title"><span class="step-n">1</span>Choose your dates</h2>
+      <div class="cal-nav">
+        <button type="button" id="cal-prev" aria-label="Previous month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+        <button type="button" id="cal-next" aria-label="Next month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
       </div>
     </div>
-  </div>
-</div>
+    <div class="months" id="months"></div>
+    <div class="cal-status">
+      <div class="avail-msg" id="avail-msg" role="status">Select your check-in date.</div>
+      <button type="button" class="clear-btn" id="clear-dates" hidden>Clear dates</button>
+    </div>
+    <input type="hidden" id="checkin">
+    <input type="hidden" id="checkout">
+    <input type="hidden" id="guests" value="2">
+  </section>
+
+  <section class="card locked" id="guest-form" inert>
+    <div class="card-head">
+      <h2 class="card-title"><span class="step-n">2</span>Your details</h2>
+      <span class="lock-note" id="lock-note">Choose your dates first</span>
+    </div>
+    <div class="form-grid">
+      <div class="field full">
+        <label for="g-name">First &amp; last name</label>
+        <input type="text" id="g-name" placeholder="Jane Smith" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="g-email">Email</label>
+        <input type="email" id="g-email" placeholder="jane@email.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="g-phone">Phone <span class="opt">optional</span></label>
+        <input type="tel" id="g-phone" placeholder="+27 82 000 0000" autocomplete="tel">
+      </div>
+      <div class="field full">
+        <label for="g-message">Message to host <span class="opt">optional</span></label>
+        <textarea id="g-message" placeholder="Arrival time, special requests, questions…"></textarea>
+      </div>
+    </div>
+    <div class="error-msg" id="form-error" role="alert"></div>
+    <button class="submit-btn" id="submit-btn" onclick="submitBooking()">Request booking</button>
+    <p class="form-note">Your request goes to the host for confirmation.</p>
+  </section>
+</main>
 
 <!-- Success screen -->
-<div id="success-screen" style="display:none;max-width:560px;margin:40px auto;padding:0 20px">
+<div id="success-screen" style="display:none">
   <div class="card success-box">
-    <div class="success-icon">🎉</div>
-    <h2>Booking request sent!</h2>
-    <p>Thank you for your booking request. The host will review your dates and get back to you at <strong id="conf-email"></strong> to confirm.</p>
+    <svg class="success-icon" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26"/><path d="m17 29 8 8 15-17"/></svg>
+    <h2>Request sent</h2>
+    <p>Thank you. The host will review your dates and reply to <strong id="conf-email"></strong> to confirm.</p>
+    <dl class="success-stay" id="conf-stay"></dl>
     <div class="success-ref" id="conf-ref"></div>
-    <button class="submit-btn" style="max-width:200px;margin:20px auto 0" onclick="location.href='/book'">Book another stay</button>
+    <button class="submit-btn" onclick="location.href='/book'">Book another stay</button>
   </div>
 </div>
 

@@ -1,48 +1,61 @@
-/* shared.css — CSS variables, reset, and components used by both pages */
+/* shared.css — reset, type, platform colours and motion used by both pages */
 
 /* ── Google Fonts ─────────────────────────────────────────────
    Import in each HTML file:
-   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 */
 
 /* ── Reset ────────────────────────────────────────────────────*/
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Source colours ───────────────────────────────────────────*/
 :root {
-  --airbnb:     #e8806a;
-  --booking:    #5ba3d6;
-  --lekkeslaap: #F47920;
-  --direct:     #7a6abf;
+  /* Type */
+  --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-ui:      'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Semantic */
-  --color-success: #6ab86a;
-  --color-warning: #c8a96e;
-  --color-danger:  #e8837a;
+  /* Platform colours — the only saturated colours in the dashboard */
+  --airbnb:     #ff7a70;
+  --booking:    #5cb0ff;
+  --lekkeslaap: #f5a623;
+  --direct:     #b497ff;
+  --blocked:    #66707a;
+
+  /* Motion */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
 }
 
-/* ── Spinner ──────────────────────────────────────────────────*/
-@keyframes spin { to { transform: rotate(360deg); } }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
 
-/* ── Badges ───────────────────────────────────────────────────*/
-.badge { font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
+/* ── Platform colour hook ─────────────────────────────────────
+   Any element with a src-* class exposes its colour as --src. */
+.src-airbnb     { --src: var(--airbnb); }
+.src-booking    { --src: var(--booking); }
+.src-lekkeslaap { --src: var(--lekkeslaap); }
+.src-direct     { --src: var(--direct); }
+.src-blocked    { --src: var(--blocked); }
 
-.badge-airbnb     { background: rgba(232,128,106,0.15); color: var(--airbnb); }
-.badge-booking    { background: rgba(91,163,214,0.15);  color: var(--booking); }
-.badge-lekkeslaap { background: rgba(244,121,32,0.15);  color: var(--lekkeslaap); }
-.badge-direct     { background: rgba(122,106,191,0.15); color: var(--direct); }
-.badge-blocked    { background: rgba(255,255,255,0.05); color: #6a6760; }
+/* ── Keyframes ────────────────────────────────────────────────*/
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes rise    { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fade    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shimmer { to { background-position: -200% 0; } }
 
-/* ── Booking card source borders ─────────────────────────────*/
-.booking-card.src-airbnb     { border: 1px solid rgba(232,128,106,0.2); border-left: 3px solid var(--airbnb); }
-.booking-card.src-booking    { border: 1px solid rgba(91,163,214,0.2);  border-left: 3px solid var(--booking); }
-.booking-card.src-lekkeslaap { border: 1px solid rgba(244,121,32,0.2);  border-left: 3px solid var(--lekkeslaap); }
-.booking-card.src-direct     { border: 1px solid rgba(122,106,191,0.2); border-left: 3px solid var(--direct); }
-.booking-card.src-blocked    { border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid #6a6760; }
-
-/* ── Calendar day source colours ─────────────────────────────*/
-.cal-day.src-airbnb     { background: rgba(232,128,106,0.18); color: var(--airbnb); }
-.cal-day.src-booking    { background: rgba(91,163,214,0.18);  color: var(--booking); }
-.cal-day.src-lekkeslaap { background: rgba(244,121,32,0.18);  color: var(--lekkeslaap); }
-.cal-day.src-direct     { background: rgba(122,106,191,0.18); color: var(--direct); }
-.cal-day.src-blocked    { background: rgba(255,255,255,0.05); color: #6a6760; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
