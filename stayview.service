@@ -1,0 +1,28 @@
+# systemd unit for running StayView on a Raspberry Pi (or any Linux host).
+#
+# Before installing, change User and the two paths below to match where
+# you cloned the repo. Check your Node path with:  which node
+#
+# Install:
+#   sudo cp stayview.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now stayview
+
+[Unit]
+Description=StayView rental dashboard
+# Wait for the network so the first iCal fetch can succeed
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/stayview
+ExecStart=/usr/bin/node /home/pi/stayview/server.js
+# Bring the server back if it crashes or is killed, after a short pause
+Restart=always
+RestartSec=5
+
+[Install]
+# Start on boot
+WantedBy=multi-user.target

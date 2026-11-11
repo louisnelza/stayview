@@ -121,15 +121,78 @@ Click **Refresh** in the dashboard header to load the new booking. Direct bookin
 
 ## Deploying to a Raspberry Pi
 
+Run StayView as a systemd service so it starts on boot and is restarted automatically if it ever stops.
+
+### 1. Install Node.js and get the code
+
 ```bash
-# Copy files to your Pi, then:
-sudo cp stayview.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable stayview
-sudo systemctl start stayview
+sudo apt update && sudo apt install -y nodejs git
+git clone https://github.com/louisnelza/stayview.git ~/stayview
+cd ~/stayview
+cp .env.example .env   # then add your iCal URLs
 ```
 
-Starts automatically on boot. View logs with `journalctl -u stayview -f`.
+StayView needs Node.js 18 or newer — check with `node --version`.
+
+### 2. Edit the service file
+
+The repo includes `stayview.service`:
+
+```ini
+[Unit]
+Description=StayView rental dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/stayview
+ExecStart=/usr/bin/node /home/pi/stayview/server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Change three things to match your Pi:
+
+- `User` — the account that owns the `stayview` folder (run `whoami`)
+- `WorkingDirectory` and the path in `ExecStart` — where you cloned the repo
+- `/usr/bin/node` — the output of `which node`
+
+### 3. Install and start it
+
+```bash
+sudo cp stayview.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now stayview
+```
+
+`enable` makes it start on every boot; `--now` also starts it straight away. Open `http://<your-pi-address>:3456` from any device on the same network.
+
+### How it stays alive
+
+- **On boot** — `WantedBy=multi-user.target` starts the service whenever the Pi powers up, and `After=network-online.target` waits for the network so the first calendar fetch can succeed.
+- **After a crash** — `Restart=always` brings the server back five seconds (`RestartSec=5`) after it exits for any reason.
+- **After a power cut** — nothing to do; the Pi boots and the service starts itself.
+
+### Day-to-day commands
+
+```bash
+systemctl status stayview          # is it running?
+journalctl -u stayview -f          # follow the logs
+sudo systemctl restart stayview    # restart after changing .env or updating
+sudo systemctl stop stayview       # stop it
+sudo systemctl disable stayview    # stop it starting on boot
+```
+
+To update to a newer version:
+
+```bash
+cd ~/stayview && git pull && sudo systemctl restart stayview
+```
 
 ## Deploying to Render (live URL)
 
@@ -159,6 +222,17 @@ Download the latest release for your platform from [Releases](https://github.com
 Place the executable and `config.txt` in the same folder. Edit `config.txt` with your iCal URLs, then double-click (Windows) or run from terminal (Mac/Linux).
 
 See `SETUP.md` for detailed instructions.
+
+### Building the executables from source
+
+The release files are built with [pkg](https://github.com/vercel/pkg), which is the project's only dev dependency:
+
+```bash
+npm install      # installs pkg
+npm run build    # writes the three executables to dist/
+```
+
+This produces `dist/stayview-win.exe`, `dist/stayview-macos` and `dist/stayview-linux`.
 
 ## Runtime Files
 
