@@ -406,17 +406,27 @@ function saveBookings(bookings) {
   fs.writeFileSync(getBookingsPath(), JSON.stringify(bookings, null, 2));
 }
 
+// Details of the property the booking page sells. The page handles one
+// property, so with the numbered format this is property 1. Each setting
+// is read from PROPERTY_1_* first, then from the legacy single-property
+// name, so both config formats (and a mix of the two) work.
 function getPropertyConfig() {
   loadConfig();
+  const setting = (numbered, legacy) =>
+    process.env[`PROPERTY_1_${numbered}`] || process.env[legacy] || "";
+  const number = (value, fallback) => {
+    const n = parseFloat(value);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+  };
   return {
-    name:        process.env.PROPERTY_NAME        || "My Property",
-    description: process.env.PROPERTY_DESCRIPTION || "A beautiful place to stay.",
-    location:    process.env.PROPERTY_LOCATION    || "",
-    nightly_rate: parseFloat(process.env.NIGHTLY_RATE || "0"),
-    currency:    process.env.CURRENCY             || "ZAR",
-    min_nights:  parseInt(process.env.MIN_NIGHTS  || "1"),
-    max_guests:  parseInt(process.env.MAX_GUESTS  || "10"),
-    photo_url:   process.env.PROPERTY_PHOTO_URL   || "",
+    name:         setting("NAME", "PROPERTY_NAME")               || "My Property",
+    description:  setting("DESCRIPTION", "PROPERTY_DESCRIPTION") || "A beautiful place to stay.",
+    location:     setting("LOCATION", "PROPERTY_LOCATION"),
+    nightly_rate: number(setting("NIGHTLY_RATE", "NIGHTLY_RATE"), 0),
+    currency:     setting("CURRENCY", "CURRENCY")                || "ZAR",
+    min_nights:   Math.max(1, Math.floor(number(setting("MIN_NIGHTS", "MIN_NIGHTS"), 1))),
+    max_guests:   Math.max(1, Math.floor(number(setting("MAX_GUESTS", "MAX_GUESTS"), 10))),
+    photo_url:    setting("PHOTO_URL", "PROPERTY_PHOTO_URL"),
   };
 }
 
