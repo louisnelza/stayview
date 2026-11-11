@@ -370,6 +370,13 @@ async function submitBooking() {
       body:    JSON.stringify({ name, email, phone, guests, checkin, checkout, message }),
     });
     const data = await res.json();
+    if (res.status === 409) {
+      // Someone else took these nights while this page was open
+      await datesJustTaken(data.error);
+      btn.disabled    = false;
+      btn.textContent = 'Request booking';
+      return;
+    }
     if (!res.ok || !data.success) throw new Error(data.error || 'Booking failed');
 
     // Show success screen
@@ -388,6 +395,20 @@ async function submitBooking() {
     btn.disabled    = false;
     btn.textContent = 'Request booking';
   }
+}
+
+// Reload availability, clear the selection and send the guest back to the
+// calendar. Their details stay in the form for the next attempt.
+async function datesJustTaken(message) {
+  try {
+    const avail = await fetch('/api/availability').then(r => r.json());
+    blockedDates = new Set(avail.blocked || []);
+  } catch(e) {}
+  sel.in = sel.out = previewOut = '';
+  onDatesChange();
+  $('avail-msg').className   = 'avail-msg unavailable';
+  $('avail-msg').textContent = message || 'Sorry, those dates have just been taken. Please choose different dates.';
+  $('dates-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ── Start ─────────────────────────────────────────────────────
