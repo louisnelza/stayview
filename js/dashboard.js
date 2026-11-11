@@ -705,10 +705,12 @@ bookingsArea.addEventListener('click', e => {
 
 // ── Delete booking ────────────────────────────────────────────
 let pendingDeleteUid = null;
+let deleteTrigger    = null; // element to hand focus back to when the dialog closes
 
 function openDeleteModal(b) {
   if (!b) return;
   pendingDeleteUid = b.uid;
+  deleteTrigger    = document.activeElement;
   document.getElementById('delete-modal-body').innerHTML =
     `The direct booking for <strong>${escHtml(b.summary || 'Guest')}</strong>, ${fmtDay(b.start)} → ${fmtDay(b.end)}, will be removed and its dates reopened. This can’t be undone.`;
   document.getElementById('delete-modal-error').hidden = true;
@@ -719,10 +721,21 @@ function openDeleteModal(b) {
 function closeDeleteModal() {
   document.getElementById('delete-modal').style.display = 'none';
   pendingDeleteUid = null;
+  if (deleteTrigger && deleteTrigger.isConnected) deleteTrigger.focus();
+  deleteTrigger = null;
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && pendingDeleteUid) closeDeleteModal();
+  if (!pendingDeleteUid) return;
+  if (e.key === 'Escape') { closeDeleteModal(); return; }
+  // Keep Tab inside the dialog while it is open
+  if (e.key === 'Tab') {
+    const btns  = [...document.querySelectorAll('#delete-modal button:not(:disabled)')];
+    const first = btns[0], last = btns[btns.length - 1];
+    if (!btns.includes(document.activeElement)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
 });
 
 async function confirmDelete() {

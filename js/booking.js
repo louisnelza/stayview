@@ -205,6 +205,29 @@ $('months').addEventListener('click', e => {
   if (again) again.focus({ preventScroll: true });
 });
 
+// Arrow keys move between selectable days, turning the page when needed
+$('months').addEventListener('keydown', e => {
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+  const btn  = e.target.closest('.day');
+  if (!step || !btn) return;
+  e.preventDefault();
+  const d = parseYmd(btn.dataset.date);
+  for (let i = 0; i < 62; i++) {
+    d.setDate(d.getDate() + step);
+    const find = () => document.querySelector(`#months .day[data-date="${localYmd(d)}"]`);
+    let target = find();
+    // Not rendered, or in the second month that is hidden on small screens
+    if (!target || target.offsetParent === null) {
+      const nav = $(step > 0 ? 'cal-next' : 'cal-prev');
+      if (nav.disabled) return;
+      shiftMonth(step > 0 ? 1 : -1);
+      target = find();
+      if (!target) return;
+    }
+    if (!target.disabled) { target.focus(); return; }
+  }
+});
+
 // Preview the range while choosing a check-out
 function setPreview(ds) {
   const next = ds && dayRole(ds) === 'out' ? ds : '';
