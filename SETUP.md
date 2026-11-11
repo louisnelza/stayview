@@ -73,7 +73,7 @@ Open **http://localhost:3456** in your browser.
 
 ## Updating your iCal URLs
 
-Just edit `config.txt`, save it, and click **↻ Refresh** in the dashboard.
+Just edit `config.txt`, save it, and click **Refresh** in the dashboard header.
 No need to restart the app.
 
 ---

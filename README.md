@@ -18,11 +18,13 @@ A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com*
 - **Multi-property** — manage multiple rentals from one dashboard with a property switcher
 - **Direct booking engine** — guest-facing `/book` page so guests can book without platform commissions
 - **Manual booking capture** — add walk-in or phone bookings directly to the dashboard
+- **Today briefing** — a one-line summary of today's arrivals, departures and same-day turnarounds
+- **Stay timeline** — one row per property, one bar per stay, colour-coded by platform; click a bar to jump to its booking
 - **Calendar view** — colour-coded by platform with turnaround day indicators
-- **Granular booking status** — Checking In / Checked In / Checking Out / Upcoming / Past
+- **Granular booking status** — Arrives today / In house / Leaves today / In N days / Past
 - **Turnaround day indicator** — flags same-day checkout + checkin between bookings
-- **30-day occupancy stats** — nights booked, active guests, upcoming bookings
-- **Platform filters** — only shows filters for platforms you have configured
+- **30-day occupancy stats** — night-by-night occupancy strip, guests in house, upcoming arrivals
+- **Platform filters** — only shows filters for platforms you have configured, plus direct bookings
 - **Auto-refresh** — server-side polling keeps data current without manual refresh
 - **Platform downtime resilience** — cached iCal data served when a platform is temporarily unavailable
 - **Lekkeslaap guest details** — reference number, email, cell and supplier link on booking cards
@@ -107,7 +109,7 @@ To manually capture a walk-in or phone booking, add an entry to `bookings.json` 
 ]
 ```
 
-Click **↻ Refresh** in the dashboard to load the new booking. Direct bookings appear in purple and can be deleted from the dashboard with the ✕ button.
+Click **Refresh** in the dashboard header to load the new booking. Direct bookings appear in purple and can be deleted from the dashboard with the bin button on their card.
 
 ## Where to find your iCal URLs
 
@@ -172,7 +174,7 @@ These files are created automatically and are listed in `.gitignore`:
 
 ## Stack
 
-- **Frontend**: Vanilla HTML/CSS/JS, DM Sans + DM Serif Display fonts
+- **Frontend**: Vanilla HTML/CSS/JS, Geist + Geist Mono fonts (loaded from Google Fonts)
 - **Backend**: Node.js built-in `http` / `https` modules — zero npm dependencies
 - **Hosting**: Raspberry Pi with systemd, any Node.js host, or packaged executable
 - **Config**: `.env` file (developers/Pi) or `config.txt` (executable users)
