@@ -2,6 +2,8 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
+const { KnownUidStore } = require("./booking-diff.js");
 
 // ── Config loading ───────────────────────────────────────────
 // Two config formats are supported intentionally:
@@ -202,6 +204,54 @@ function buildCachedResults() {
 // Load cache from disk on startup
 loadDiskCache();
 
+// ── New booking detection ────────────────────────────────────
+// Every fresh (non-stale) fetch is diffed against known-uids.json.
+const knownUids = new KnownUidStore(path.join(getBaseDir(), "known-uids.json"));
+
+function detectBookingChanges(property, source, text) {
+  const sourceKey = `${property.id}:${source}`;
+  let bookings;
+  try {
+    bookings = parseIcal(text, source, property.id);
+  } catch(e) {
+    console.warn(`  [diff] ${sourceKey} could not parse feed: ${e.message}`);
+    return;
+  }
+  const result = knownUids.update(sourceKey, bookings);
+  if (result.baseline) {
+    console.log(`  [diff] ${sourceKey} baseline set — ${result.next.length} UID${result.next.length !== 1 ? 's' : ''} known`);
+    return;
+  }
+  if (result.skipped) {
+    console.warn(`  [diff] ${sourceKey} feed returned no events — keeping known UIDs (possible platform glitch)`);
+    return;
+  }
+  result.removed.forEach(uid => console.log(`  [diff] ${sourceKey} UID no longer in feed: ${uid}`));
+  if (result.added.length > 0) handleNewBookings(property, source, result.added);
+}
+
+// Notification senders (Telegram, ntfy, email — #54–#57) hook in here.
+function handleNewBookings(property, source, bookings) {
+  const label = SOURCE_LABELS[source] || source;
+  for (const b of bookings) {
+    console.log(`  [diff] New ${label} booking — ${property.name}: ${b.summary}, ` +
+      `${fmtFull(b.start)} → ${fmtFull(b.end)} (${b.nights} night${b.nights !== 1 ? 's' : ''})`);
+  }
+}
+
+// Store a successful fetch in the cache and check it for new bookings
+function cacheFreshSource(property, name, text) {
+  const result = {
+    name, propertyId: property.id, success: true,
+    data: text, error: null,
+    empty: !text.includes('BEGIN:VEVENT'), stale: false,
+  };
+  serverSourceCache[`${property.id}:${name}`] = { result, fetchedAt: new Date() };
+  saveDiskCache();
+  detectBookingChanges(property, name, text);
+  return result;
+}
+
 async function fetchPropertySources(property) {
   const entries = Object.entries(property.sources).filter(([, u]) => u);
   return Promise.all(entries.map(async ([name, srcUrl]) => {
@@ -209,7 +259,6 @@ async function fetchPropertySources(property) {
     try {
       const text = await fetchUrl(srcUrl);
       const hasCalendar = text.includes('BEGIN:VCALENDAR');
-      const hasEvents   = text.includes('BEGIN:VEVENT');
       if (!hasCalendar) {
         console.log(`  [P${property.id}:${name}] INVALID — no VCALENDAR`);
         // Don't update cache — keep last known good data
@@ -220,9 +269,7 @@ async function fetchPropertySources(property) {
         }
         return { name, propertyId: property.id, success: false, data: '', error: 'No VCALENDAR' };
       }
-      const result = { name, propertyId: property.id, success: true, data: text, error: null, empty: !hasEvents, stale: false };
-      serverSourceCache[cacheKey] = { result, fetchedAt: new Date() };
-      saveDiskCache();
+      const result = cacheFreshSource(property, name, text);
       console.log(`  [P${property.id}:${name}] OK (${text.length} chars)`);
       return result;
     } catch(e) {
@@ -285,18 +332,12 @@ function startCachePrimer() {
       return;
     }
     console.log(`[cache] Retrying ${uncached.length} uncached source${uncached.length > 1 ? 's' : ''}...`);
-    await Promise.all(uncached.map(async ({ prop, name, url, key }) => {
+    await Promise.all(uncached.map(async ({ prop, name, url }) => {
       try {
         const text = await fetchUrl(url);
         const hasCalendar = text.includes('BEGIN:VCALENDAR');
         if (!hasCalendar) { console.log(`  [${name}] retry: invalid iCal`); return; }
-        const result = {
-          name, propertyId: prop.id, success: true,
-          data: text, error: null,
-          empty: !text.includes('BEGIN:VEVENT'), stale: false,
-        };
-        serverSourceCache[key] = { result, fetchedAt: new Date() };
-        saveDiskCache();
+        cacheFreshSource(prop, name, text);
         console.log(`  [${name}] retry: cached successfully`);
       } catch(e) {
         console.log(`  [${name}] retry: still failing — ${e.message}`);
@@ -319,6 +360,7 @@ function fetchUrl(targetUrl, redirectCount = 0) {
     const parsed = new URL(targetUrl);
     const options = {
       hostname: parsed.hostname,
+      port: parsed.port || 443,
       path: parsed.pathname + parsed.search,
       headers: HEADERS,
       timeout: 15000,
@@ -326,9 +368,8 @@ function fetchUrl(targetUrl, redirectCount = 0) {
     https.get(options, (res) => {
       console.log(`  [${parsed.hostname}] HTTP ${res.statusCode}`);
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const location = res.headers.location.startsWith("http")
-          ? res.headers.location
-          : `${parsed.protocol}//${parsed.hostname}${res.headers.location}`;
+        // Resolve relative redirects against the current URL (keeps host and port)
+        const location = new URL(res.headers.location, targetUrl).href;
         res.resume();
         return fetchUrl(location, redirectCount + 1).then(resolve).catch(reject);
       }
@@ -365,17 +406,27 @@ function saveBookings(bookings) {
   fs.writeFileSync(getBookingsPath(), JSON.stringify(bookings, null, 2));
 }
 
+// Details of the property the booking page sells. The page handles one
+// property, so with the numbered format this is property 1. Each setting
+// is read from PROPERTY_1_* first, then from the legacy single-property
+// name, so both config formats (and a mix of the two) work.
 function getPropertyConfig() {
   loadConfig();
+  const setting = (numbered, legacy) =>
+    process.env[`PROPERTY_1_${numbered}`] || process.env[legacy] || "";
+  const number = (value, fallback) => {
+    const n = parseFloat(value);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+  };
   return {
-    name:        process.env.PROPERTY_NAME        || "My Property",
-    description: process.env.PROPERTY_DESCRIPTION || "A beautiful place to stay.",
-    location:    process.env.PROPERTY_LOCATION    || "",
-    nightly_rate: parseFloat(process.env.NIGHTLY_RATE || "0"),
-    currency:    process.env.CURRENCY             || "ZAR",
-    min_nights:  parseInt(process.env.MIN_NIGHTS  || "1"),
-    max_guests:  parseInt(process.env.MAX_GUESTS  || "10"),
-    photo_url:   process.env.PROPERTY_PHOTO_URL   || "",
+    name:         setting("NAME", "PROPERTY_NAME")               || "My Property",
+    description:  setting("DESCRIPTION", "PROPERTY_DESCRIPTION") || "A beautiful place to stay.",
+    location:     setting("LOCATION", "PROPERTY_LOCATION"),
+    nightly_rate: number(setting("NIGHTLY_RATE", "NIGHTLY_RATE"), 0),
+    currency:     setting("CURRENCY", "CURRENCY")                || "ZAR",
+    min_nights:   Math.max(1, Math.floor(number(setting("MIN_NIGHTS", "MIN_NIGHTS"), 1))),
+    max_guests:   Math.max(1, Math.floor(number(setting("MAX_GUESTS", "MAX_GUESTS"), 10))),
+    photo_url:    setting("PHOTO_URL", "PROPERTY_PHOTO_URL"),
   };
 }
 
@@ -387,11 +438,10 @@ function parseIcalDates(text) {
     const get = k => { const m = ev.match(new RegExp(k + "[^:]*:([^\r\n]+)")); return m ? m[1].trim() : ""; };
     const dtstart = get("DTSTART"), dtend = get("DTEND");
     if (!dtstart || !dtend) continue;
-    const parseD = s => { const c = s.replace(/T.*/,""); return new Date(+c.slice(0,4), +c.slice(4,6)-1, +c.slice(6,8)); };
-    const start = parseD(dtstart), end = parseD(dtend);
+    const start = parseDate(dtstart), end = parseDate(dtend);
     if (isNaN(start) || isNaN(end)) continue;
     for (let d = new Date(start); d < end; d.setDate(d.getDate()+1)) {
-      blocked.push(d.toISOString().slice(0,10));
+      blocked.push(localYmd(d));
     }
   }
   return blocked;
@@ -406,17 +456,53 @@ function readBody(req) {
   });
 }
 
-function serveFile(res, filePath, fallbackPath, contentType) {
-  const externalPath = path.join(getBaseDir(), filePath);
-  let html = null;
-  if (fs.existsSync(externalPath)) {
-    html = fs.readFileSync(externalPath, "utf8");
-  } else {
-    try { html = fs.readFileSync(path.join(__dirname, fallbackPath || filePath), "utf8"); } catch(e) {}
+// Read a file that ships with the app (pages, scripts, styles).
+// A copy next to the script or executable wins, so files can be updated
+// without rebuilding; otherwise the copy bundled inside the pkg executable
+// is used. Returns null if neither exists.
+function readAppFile(relPath) {
+  for (const dir of [getBaseDir(), __dirname]) {
+    try { return fs.readFileSync(path.join(dir, relPath)); } catch(e) {}
   }
-  if (!html) { res.writeHead(404); res.end("File not found"); return; }
-  res.writeHead(200, { "Content-Type": contentType || "text/html; charset=utf-8", "Cache-Control": "no-store" });
-  res.end(html);
+  return null;
+}
+
+function sendAppFile(res, relPath, contentType, notFoundMessage) {
+  const body = readAppFile(relPath);
+  if (body === null) { res.writeHead(404); res.end(notFoundMessage || "File not found"); return; }
+  res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-store" });
+  res.end(body);
+}
+
+// Every night that is already taken, as a Set of YYYY-MM-DD strings:
+// nights blocked on the platform iCal feeds plus direct bookings.
+async function getBlockedDates() {
+  const blockedDates = new Set();
+  // Platform iCal blocked dates
+  await Promise.all(Object.values(getSources()).filter(Boolean).map(async srcUrl => {
+    try {
+      const text = await fetchUrl(srcUrl);
+      parseIcalDates(text).forEach(d => blockedDates.add(d));
+    } catch(e) {}
+  }));
+  addDirectBookingNights(blockedDates);
+  return blockedDates;
+}
+
+// Synchronous on purpose — /api/book calls it immediately before saving,
+// with no await in between, so two requests can't both pass the check.
+function addDirectBookingNights(blockedDates) {
+  loadBookings().forEach(b => {
+    const d = parseYmd(b.checkin);
+    const end = parseYmd(b.checkout);
+    while (d < end) { blockedDates.add(localYmd(d)); d.setDate(d.getDate()+1); }
+  });
+  return blockedDates;
+}
+
+function sendJson(res, status, payload) {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(payload));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -544,44 +630,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === "/" || pathname === "/index.html") {
-    // When running as a pkg executable, index.html is bundled inside.
-    // When running as plain Node, check next to the script first, then fall back to bundled.
-    let html = null;
-    const externalPath = path.join(
-      process.pkg ? path.dirname(process.execPath) : __dirname,
-      "index.html"
-    );
-    if (fs.existsSync(externalPath)) {
-      // External file takes priority — allows updates without rebuilding the executable
-      html = fs.readFileSync(externalPath, "utf8");
-    } else {
-      try {
-        // Fall back to bundled version inside the executable
-        html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
-      } catch(e) {
-        res.writeHead(404); res.end("index.html not found"); return;
-      }
-    }
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-    res.end(html);
+    sendAppFile(res, "index.html", "text/html; charset=utf-8", "index.html not found");
     return;
   }
 
   // ── Booking engine: public page ──────────────────────────────
-  // Booking engine — enabled when feature/booking-engine is released
   if (pathname === "/book" || pathname === "/book.html") {
-    const bookFile = ["book", "html"].join("."); // dynamic so pkg doesn't scan it
-    const bookExternal = path.join(
-      process.pkg ? path.dirname(process.execPath) : __dirname,
-      bookFile
-    );
-    let bookHtml = null;
-    if (fs.existsSync(bookExternal)) {
-      bookHtml = fs.readFileSync(bookExternal, "utf8");
-    }
-    if (!bookHtml) { res.writeHead(404); res.end("Booking engine not yet available."); return; }
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-    res.end(bookHtml);
+    sendAppFile(res, "book.html", "text/html; charset=utf-8", "Booking page not found");
     return;
   }
 
@@ -593,23 +648,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === "/api/availability") {
-    const sources = getSources();
-    const blockedDates = new Set();
-    // Add platform iCal blocked dates
-    await Promise.all(Object.values(sources).filter(Boolean).map(async srcUrl => {
-      try {
-        const text = await fetchUrl(srcUrl);
-        parseIcalDates(text).forEach(d => blockedDates.add(d));
-      } catch(e) {}
-    }));
-    // Add direct bookings
-    loadBookings().forEach(b => {
-      let d = new Date(b.checkin);
-      const end = new Date(b.checkout);
-      while (d < end) { blockedDates.add(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
-    });
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ blocked: [...blockedDates] }));
+    sendJson(res, 200, { blocked: [...await getBlockedDates()] });
     return;
   }
 
@@ -623,14 +662,38 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: "Missing required fields" }));
         return;
       }
-      const start = new Date(checkin), end = new Date(checkout);
-      if (isNaN(start) || isNaN(end) || end <= start) {
+      if (!isValidYmd(checkin) || !isValidYmd(checkout)) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid dates" }));
         return;
       }
-      const nights = Math.round((end - start) / 86400000);
+      const start = parseYmd(checkin), end = parseYmd(checkout);
+      if (end <= start) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid dates" }));
+        return;
+      }
+      const nights = nightsBetween(start, end);
       const cfg = getPropertyConfig();
+      if (checkin < localYmd(new Date())) {
+        sendJson(res, 400, { error: "Check-in date is in the past" });
+        return;
+      }
+      if (nights < cfg.min_nights) {
+        sendJson(res, 400, { error: `Minimum stay is ${cfg.min_nights} night${cfg.min_nights > 1 ? "s" : ""}` });
+        return;
+      }
+      // Refuse nights that are already taken. The page only offers free
+      // dates, but its view can be stale (two guests booking at once) and
+      // the endpoint can be called directly. Platform feeds are fetched
+      // first; direct bookings are re-read right before saving.
+      const taken = addDirectBookingNights(await getBlockedDates());
+      for (const d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+        if (taken.has(localYmd(d))) {
+          sendJson(res, 409, { error: "Sorry, those dates have just been taken. Please choose different dates." });
+          return;
+        }
+      }
       const booking = {
         uid: "direct-" + Date.now(),
         source: "direct",
@@ -681,20 +744,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Static files: /js/ and /css/ ─────────────────────────────
-  if (pathname.startsWith('/js/') || pathname.startsWith('/css/')) {
-    const ext      = pathname.split('.').pop();
-    const mimeMap  = { js: 'application/javascript', css: 'text/css' };
-    const mimeType = mimeMap[ext] || 'text/plain';
-    const filePath = path.join(
-      process.pkg ? path.dirname(process.execPath) : __dirname,
-      pathname
-    );
-    if (fs.existsSync(filePath)) {
-      res.writeHead(200, { 'Content-Type': mimeType, 'Cache-Control': 'no-store' });
-      res.end(fs.readFileSync(filePath));
-    } else {
-      res.writeHead(404); res.end('Static file not found: ' + pathname);
-    }
+  // Only plain file names directly inside js/ or css/ — nothing that
+  // could step outside those folders.
+  const staticMatch = pathname.match(/^\/(js|css)\/([\w-]+(?:\.[\w-]+)*)\.(js|css)$/);
+  if (staticMatch && staticMatch[1] === staticMatch[3]) {
+    const mimeType = staticMatch[3] === "js" ? "application/javascript" : "text/css";
+    sendAppFile(res, pathname.slice(1), mimeType, "Static file not found: " + pathname);
     return;
   }
 

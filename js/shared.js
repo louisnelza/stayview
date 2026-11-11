@@ -23,10 +23,44 @@ function today() {
   return d;
 }
 
+// Format a Date as a local calendar date (YYYY-MM-DD). Never use
+// toISOString() for this — it converts to UTC and shifts the date
+// back a day in UTC+ timezones.
+function localYmd(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Parse a YYYY-MM-DD string as local midnight. new Date('YYYY-MM-DD')
+// parses as UTC midnight, which is the wrong day in UTC- timezones
+// and not local midnight in UTC+ ones.
+function parseYmd(s) {
+  return new Date(s + 'T00:00:00');
+}
+
+// True only for a real calendar date in strict YYYY-MM-DD form.
+// Rejects impossible dates like 2026-02-30, which Date would
+// otherwise roll forward to 2 March.
+function isValidYmd(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = parseYmd(s);
+  return !isNaN(d) && localYmd(d) === s;
+}
+
+// Parse an iCal DTSTART/DTEND value to local midnight of its day.
+//   20261110 / 2026-11-10    date-only: that calendar day
+//   20261110T140000          floating or TZID local time: that day
+//   20261110T230000Z         UTC instant: the local day it falls on
+// Anything else returns an Invalid Date so the event is skipped.
 function parseDate(s) {
-  const c = s.replace(/T.*/, '');
-  if (c.length === 8) return new Date(+c.slice(0,4), +c.slice(4,6)-1, +c.slice(6,8));
-  return new Date(s);
+  const m = s.match(/^(\d{4})-?(\d{2})-?(\d{2})(?:T(\d{2}):?(\d{2}):?(\d{2})(Z)?)?/);
+  if (!m) return new Date(NaN);
+  const [, y, mo, d, h, mi, sec, utc] = m;
+  if (utc) {
+    const t = new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +sec));
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }
+  return new Date(+y, +mo - 1, +d);
 }
 
 function fmtShort(d) {
@@ -68,7 +102,7 @@ function findTurnarounds(bookings) {
   const real = bookings.filter(bk => !bk.isBlocked);
 
   for (const a of real) {
-    const aEndStr = a.end.toISOString().slice(0, 10);
+    const aEndStr = localYmd(a.end);
 
     // Case 1 & 2: Every checkout day needs a turnaround
     if (!turnarounds.has(aEndStr)) {
@@ -79,15 +113,15 @@ function findTurnarounds(bookings) {
     for (const bk of real) {
       if (a.uid === bk.uid) continue;
       if (a.propertyId !== bk.propertyId) continue;
-      const bkStartStr = bk.start.toISOString().slice(0, 10);
+      const bkStartStr = localYmd(bk.start);
 
       if (a.end.getTime() === bk.start.getTime()) {
         // Same-day swap — mark both checkout and checkin date (same date)
         turnarounds.set(aEndStr, { type: 'swap', propertyId: a.propertyId });
       } else {
         // Case 3: Checkin within GAP_DAYS of a previous checkout
-        const gapMs = bk.start.getTime() - a.end.getTime();
-        const gapDays = gapMs / 86400000;
+        // Round so a gap spanning a DST change still counts as whole days
+        const gapDays = nightsBetween(a.end, bk.start);
         if (gapDays > 0 && gapDays <= TURNAROUND_GAP_DAYS) {
           if (!turnarounds.has(bkStartStr)) {
             turnarounds.set(bkStartStr, { type: 'checkin', propertyId: bk.propertyId });
@@ -208,3 +242,8 @@ function escHtml(s) {
 // A turnaround occurs when one booking ends on the same day
 // another begins. Returns a Set of date strings that are
 // turnaround days, and a Map of checkout->checkin booking pairs.
+// ── Node export ───────────────────────────────────────────────
+// Lets server.js reuse the iCal parser. No-op in the browser.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS };
+}

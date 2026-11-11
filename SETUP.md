@@ -6,7 +6,7 @@ Just **two files** in the same folder:
 
 | File | What it does |
 |---|---|
-| `stayview.exe` / `stayview-mac` / `stayview-linux` | The app (dashboard included) |
+| `stayview-win.exe` / `stayview-macos` / `stayview-linux` | The app (dashboard included) |
 | `config.txt` | Your iCal URLs and settings go here |
 
 > **Developers / Raspberry Pi users:** use a `.env` file instead of `config.txt` — same format, same keys. See the README for details.
@@ -73,7 +73,7 @@ Open **http://localhost:3456** in your browser.
 
 ## Updating your iCal URLs
 
-Just edit `config.txt`, save it, and click **↻ Refresh** in the dashboard.
+Just edit `config.txt`, save it, and click **Refresh** in the dashboard header.
 No need to restart the app.
 
 ---

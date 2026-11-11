@@ -19,3 +19,5 @@ dist/
 package-lock.json
 bookings.json
 ical-cache.json
+# Booking diff engine state
+known-uids.json
