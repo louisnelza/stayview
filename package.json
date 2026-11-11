@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "pkg server.js --targets node18-win-x64,node18-macos-x64,node18-linux-x64 --output dist/stayview"
+    "build": "pkg server.js --config package.json --output dist/stayview"
   },
   "pkg": {
     "targets": [

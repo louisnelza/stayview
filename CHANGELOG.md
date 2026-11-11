@@ -18,6 +18,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - Guest names were blank on dashboard booking cards
 - Delete button no longer builds inline handlers from guest names
+- **Double bookings** — the server now refuses a direct booking for nights that are already taken (by a platform feed or another direct booking), for check-in dates in the past, and for stays under the minimum. If the dates are taken while a guest has the booking page open, the page says so and refreshes its calendar — closes #67
+- **Packaged executables** — the build never bundled the CSS, JS or booking page, so an executable run on its own served an unstyled dashboard and no `/book` page. The build now reads the asset list in `package.json`, and the server falls back to the bundled copies — closes #68
+- Static file requests are limited to plain file names inside `js/` and `css/`
 
 ---
 
