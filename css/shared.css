@@ -1,8 +1,8 @@
 /* shared.css — reset, type, platform colours and motion used by both pages */
 
 /* ── Google Fonts ─────────────────────────────────────────────
-   Import in each HTML file:
-   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+   Import in each HTML file (one clean sans for everything, mono for references):
+   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 */
 
 /* ── Reset ────────────────────────────────────────────────────*/
@@ -10,7 +10,7 @@
 
 :root {
   /* Type */
-  --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-display: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-ui:      'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
