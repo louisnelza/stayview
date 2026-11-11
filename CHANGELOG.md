@@ -5,7 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [1.4.0] — 2026-11-11
+
+### Added
+- **Booking diff engine** — every calendar fetch is compared against `known-uids.json` so newly arrived bookings can be detected. New bookings are logged for now; this is the groundwork for notifications — closes #53
+- **`stayview.service`** — systemd unit for running StayView on a Raspberry Pi so it starts on boot and restarts after a crash, with a full walkthrough in the README
+- Build instructions for the executables (`npm install`, `npm run build`) in the README
 
 ### Changed
 - **Dashboard redesign** — new "today" briefing with a plain-language summary, a 30-night occupancy strip, and a per-property stay timeline (bars coloured by platform; overlapping entries stack). Clicking a timeline bar jumps to its booking card; hovering a card spotlights its bar.
@@ -22,6 +27,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Packaged executables** — the build never bundled the CSS, JS or booking page, so an executable run on its own served an unstyled dashboard and no `/book` page. The build now reads the asset list in `package.json`, and the server falls back to the bundled copies — closes #68
 - **Booking page ignored `PROPERTY_1_*` settings** — with the numbered config format the page showed "My Property" with no rate, minimum stay or guest limit, and direct bookings were saved without a total. It now reads property 1's settings, falling back to the legacy names
 - Static file requests are limited to plain file names inside `js/` and `css/`
+- **Dates a day out in UTC+ timezones** — calendar dates are now handled as local dates throughout, fixing false conflicts with direct bookings, a check-out minimum that was a night early, and yesterday being selectable after midnight — closes #63
+- Impossible dates such as 30 February are rejected by `/api/book` instead of rolling forward
+- iCal dates are parsed as local days, and turnaround gaps spanning a daylight-saving change count as whole days
+- Calendar feeds on a non-default port were always fetched from port 443; relative redirects now keep their host and port
 
 ---
 
