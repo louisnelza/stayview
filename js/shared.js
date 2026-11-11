@@ -88,49 +88,77 @@ function getStatus(b) {
 }
 
 // ── Turnaround detection ─────────────────────────────────────
-// Returns a map of dates that need a turnaround/service reminder.
-// Three cases:
+// Finds the dates on which a unit needs a turnaround/service reminder.
+// Three cases, in order of precedence:
 //   1. Same-day swap — one booking ends, another starts same day
 //   2. Checkout day — any booking ending (unit always needs cleaning)
 //   3. Checkin after gap — a booking starts within GAP_DAYS of a
 //      previous booking ending (unit may need refreshing)
+// Turnarounds are tracked per property, so two properties with activity
+// on the same date never overwrite each other.
 const TURNAROUND_GAP_DAYS = 3;
 
 function findTurnarounds(bookings) {
-  // Returns a Map of dateStr -> { type: 'swap'|'checkout'|'checkin', propertyId }
+  // Returns Map of propertyId -> Map of dateStr -> { type: 'swap'|'checkout'|'checkin', propertyId }
+  const byProperty = new Map();
+  for (const bk of bookings) {
+    if (bk.isBlocked) continue;
+    if (!byProperty.has(bk.propertyId)) byProperty.set(bk.propertyId, []);
+    byProperty.get(bk.propertyId).push(bk);
+  }
+
   const turnarounds = new Map();
-  const real = bookings.filter(bk => !bk.isBlocked);
+  for (const [propertyId, real] of byProperty) {
+    const days = new Map();
+    turnarounds.set(propertyId, days);
 
-  for (const a of real) {
-    const aEndStr = localYmd(a.end);
-
-    // Case 1 & 2: Every checkout day needs a turnaround
-    if (!turnarounds.has(aEndStr)) {
-      turnarounds.set(aEndStr, { type: 'checkout', propertyId: a.propertyId });
+    // Index checkouts by date so each check-in is a lookup, not a scan
+    const endingOn = new Map(); // dateStr -> bookings checking out that day
+    for (const bk of real) {
+      const endStr = localYmd(bk.end);
+      if (!endingOn.has(endStr)) endingOn.set(endStr, []);
+      endingOn.get(endStr).push(bk);
+      // Case 2: every checkout day needs a turnaround
+      days.set(endStr, { type: 'checkout', propertyId });
     }
 
-    // Check if another booking starts on the same day (upgrade to swap)
     for (const bk of real) {
-      if (a.uid === bk.uid) continue;
-      if (a.propertyId !== bk.propertyId) continue;
-      const bkStartStr = localYmd(bk.start);
+      const startStr = localYmd(bk.start);
+      const endsBefore = dateStr => (endingOn.get(dateStr) || []).some(a => a !== bk);
 
-      if (a.end.getTime() === bk.start.getTime()) {
-        // Same-day swap — mark both checkout and checkin date (same date)
-        turnarounds.set(aEndStr, { type: 'swap', propertyId: a.propertyId });
-      } else {
-        // Case 3: Checkin within GAP_DAYS of a previous checkout
-        // Round so a gap spanning a DST change still counts as whole days
-        const gapDays = nightsBetween(a.end, bk.start);
-        if (gapDays > 0 && gapDays <= TURNAROUND_GAP_DAYS) {
-          if (!turnarounds.has(bkStartStr)) {
-            turnarounds.set(bkStartStr, { type: 'checkin', propertyId: bk.propertyId });
-          }
+      // Case 1: another booking checks out the day this one checks in
+      if (endsBefore(startStr)) {
+        days.set(startStr, { type: 'swap', propertyId });
+        continue;
+      }
+      // Case 3: checkin within GAP_DAYS of a previous checkout.
+      // Stepping by calendar day keeps this correct across DST changes.
+      if (days.has(startStr)) continue;
+      for (let gap = 1; gap <= TURNAROUND_GAP_DAYS; gap++) {
+        const d = new Date(bk.start);
+        d.setDate(d.getDate() - gap);
+        if (endsBefore(localYmd(d))) {
+          days.set(startStr, { type: 'checkin', propertyId });
+          break;
         }
       }
     }
   }
   return turnarounds;
+}
+
+// The turnaround entry for one property on one date, or undefined.
+function turnaroundOn(turnarounds, propertyId, dateStr) {
+  const days = turnarounds instanceof Map ? turnarounds.get(propertyId) : null;
+  return days ? days.get(dateStr) : undefined;
+}
+
+// Whether a date has a turnaround — for one property, or for any when 'all'.
+function hasTurnaroundOn(turnarounds, dateStr, propertyId = 'all') {
+  if (!(turnarounds instanceof Map)) return false;
+  if (propertyId !== 'all') return !!turnaroundOn(turnarounds, propertyId, dateStr);
+  for (const days of turnarounds.values()) if (days.has(dateStr)) return true;
+  return false;
 }
 
 // ── iCal parsing ──────────────────────────────────────────────
@@ -238,12 +266,8 @@ function escHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
-// ── Turnaround detection ──────────────────────────────────────
-// A turnaround occurs when one booking ends on the same day
-// another begins. Returns a Set of date strings that are
-// turnaround days, and a Map of checkout->checkin booking pairs.
 // ── Node export ───────────────────────────────────────────────
 // Lets server.js reuse the iCal parser. No-op in the browser.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS };
+  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS, findTurnarounds, turnaroundOn, hasTurnaroundOn };
 }

@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **Turnarounds mixed up between properties** — turnaround days were tracked one per date across all properties, so with more than one property a checkout could hide another property's same-day swap, a "new guest arriving" reminder could be dropped, and the month calendar could show a turnaround dot belonging to a property that wasn't selected. Turnarounds are now tracked per property — closes #61
+
 ## [1.4.0] — 2026-11-11
 
 ### Added
