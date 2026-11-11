@@ -13,7 +13,7 @@ let properties       = [];   // array of { id, name, location } from /config
 let currentProperty  = 'all'; // 'all' or property id (number)
 
 // ── Turnaround state ──────────────────────────────────────────
-let turnaroundDays   = new Map(); // Map of dateStr -> { type, propertyId }
+let turnaroundDays   = new Map(); // Map of propertyId -> Map of dateStr -> { type, propertyId }
 
 // ── Auto-refresh ──────────────────────────────────────────────
 let pollInterval    = null;   // setInterval handle
@@ -527,9 +527,9 @@ function renderBookings() {
       lastStatus = status;
     }
     // Show turnaround banners based on booking status and turnaround map
-    if (!b.isBlocked && turnaroundDays instanceof Map) {
-      const checkoutEntry = turnaroundDays.get(localYmd(b.end));
-      const checkinEntry  = turnaroundDays.get(localYmd(b.start));
+    if (!b.isBlocked) {
+      const checkoutEntry = turnaroundOn(turnaroundDays, b.propertyId, localYmd(b.end));
+      const checkinEntry  = turnaroundOn(turnaroundDays, b.propertyId, localYmd(b.start));
       // Before checkout card — unit needs cleaning
       if (status === 'checking-out' && checkoutEntry) {
         html += checkoutEntry.type === 'swap'
@@ -618,7 +618,7 @@ function renderCalendar() {
     el.className  = 'cal-day';
     el.textContent = d;
     if (date.getTime() === now.getTime()) el.classList.add('today');
-    if (turnaroundDays instanceof Map && turnaroundDays.has(localYmd(date))) el.classList.add('turnaround');
+    if (hasTurnaroundOn(turnaroundDays, localYmd(date), currentProperty)) el.classList.add('turnaround');
 
     const matching = on(date);
     if (matching.length > 0) {
@@ -827,7 +827,7 @@ function setMode(mode) {
     allBookings = makeDemoBookings();
     turnaroundDays = findTurnarounds(allBookings);
     console.log('[demo] allBookings count:', allBookings.length);
-    console.log('[demo] turnaroundDays:', [...turnaroundDays.keys()]);
+    console.log('[demo] turnaroundDays:', [...turnaroundDays].map(([pid, days]) => ({ pid, dates: [...days.keys()] })));
     console.log('[demo] sample starts/ends:', allBookings.slice(0,4).map(b => ({
       name: b.summary, start: localYmd(b.start),
       end: localYmd(b.end), pid: b.propertyId
