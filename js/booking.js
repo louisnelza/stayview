@@ -2,8 +2,21 @@
 // Booking engine logic for book.html.
 // Depends on: js/shared.js (loaded first via <script> tag)
 
-let blockedDates = [];
+let blockedDates = new Set(); // nights that are already taken (YYYY-MM-DD)
 let property     = {};
+
+// Calendar state
+const sel = { in: '', out: '' };   // selected check-in / check-out (YYYY-MM-DD)
+let previewOut = '';               // check-out being hovered while choosing
+let viewYear   = new Date().getFullYear();
+let viewMonth  = new Date().getMonth();
+const MAX_MONTHS_AHEAD = 18;
+
+const $ = id => document.getElementById(id);
+const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const fmtDay = d => `${DOW_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const minNights = () => property.min_nights || 1;
 
 // ── Init ──────────────────────────────────────────────────────
 
@@ -14,49 +27,43 @@ async function init() {
       fetch('/api/availability').then(r => r.json()),
     ]);
     property     = propRes;
-    blockedDates = availRes.blocked || [];
+    blockedDates = new Set(availRes.blocked || []);
 
     // Property info
-    document.getElementById('prop-name').textContent  = property.name;
-    document.getElementById('hero-title').textContent = property.name;
-    document.getElementById('prop-desc').textContent  = property.description;
+    $('prop-name').textContent  = property.name;
+    $('hero-title').textContent = property.name;
+    $('prop-desc').textContent  = property.description;
     document.title = 'Book — ' + property.name;
-
-    if (property.location) {
-      document.getElementById('prop-location').style.display = 'flex';
-      document.getElementById('prop-location-text').textContent = property.location;
-      document.getElementById('hero-location').textContent     = property.location;
-    }
+    if (property.location) $('hero-location').textContent = property.location;
 
     if (property.photo_url) {
       const img = document.createElement('img');
       img.src = property.photo_url;
       img.alt = property.name;
-      const hero = document.getElementById('hero');
-      hero.insertBefore(img, hero.firstChild);
-      document.getElementById('hero-placeholder').style.display = 'none';
+      // Keep the illustrated hero if the photo fails to load
+      img.onload = () => { $('hero-placeholder').style.display = 'none'; };
+      img.onerror = () => img.remove();
+      $('hero').insertBefore(img, $('hero').firstChild.nextSibling);
     }
 
+    const facts = [];
+    if (property.max_guests)   facts.push(`Sleeps <b>${property.max_guests}</b>`);
+    if (minNights() > 1)       facts.push(`<b>${minNights()}-night</b> minimum`);
     if (property.nightly_rate > 0) {
-      const rateEl = document.getElementById('rate-display');
-      rateEl.style.display = 'block';
-      rateEl.innerHTML = `${fmtCurrency(property.nightly_rate)} <span>/ night</span>`;
+      facts.push(`From <b>${fmtCurrency(property.nightly_rate)}</b> a night`);
+      $('rate-display').style.display = 'block';
+      $('rate-display').innerHTML = `${fmtCurrency(property.nightly_rate)} <span>/ night</span>`;
     }
+    $('facts').innerHTML = facts.map(f => `<li>${f}</li>`).join('');
 
-    // Date constraints
-    const todayStr = localYmd(new Date());
-    document.getElementById('checkin').min  = todayStr;
-    document.getElementById('checkout').min = todayStr;
-
-    // Guest count options
-    const guestSel = document.getElementById('guests');
-    guestSel.innerHTML = '';
-    for (let i = 1; i <= (property.max_guests || 10); i++) {
-      guestSel.innerHTML += `<option value="${i}">${i} guest${i > 1 ? 's' : ''}</option>`;
-    }
+    setGuests(Math.min(2, property.max_guests || 10));
   } catch(e) {
     console.error('Init failed:', e);
+    $('prop-name').textContent = 'Book direct';
+    $('prop-desc').textContent = 'We couldn’t load this property right now. Please refresh the page to try again.';
   }
+  renderMonths();
+  updateState();
 }
 
 // ── Currency formatting ───────────────────────────────────────
@@ -67,10 +74,23 @@ function fmtCurrency(amount) {
   return sym + amount.toLocaleString('en-ZA', { minimumFractionDigits: 0 });
 }
 
+// ── Guests ────────────────────────────────────────────────────
+
+function setGuests(n) {
+  const max = property.max_guests || 10;
+  n = Math.max(1, Math.min(max, n));
+  $('guests').value = n;
+  $('guests-out').textContent = plural(n, 'guest');
+  $('guests-minus').disabled = n <= 1;
+  $('guests-plus').disabled  = n >= max;
+}
+$('guests-minus').onclick = () => setGuests(+$('guests').value - 1);
+$('guests-plus').onclick  = () => setGuests(+$('guests').value + 1);
+
 // ── Availability ──────────────────────────────────────────────
 
 function isDateBlocked(dateStr) {
-  return blockedDates.includes(dateStr);
+  return blockedDates.has(dateStr);
 }
 
 function datesInRange(checkin, checkout) {
@@ -84,129 +104,264 @@ function datesInRange(checkin, checkout) {
   return dates;
 }
 
-function onDatesChange() {
-  const checkin  = document.getElementById('checkin').value;
-
-  // Enforce min checkout = checkin + min_nights
-  if (checkin) {
-    const minCheckout = parseYmd(checkin);
-    minCheckout.setDate(minCheckout.getDate() + (property.min_nights || 1));
-    const minStr = localYmd(minCheckout);
-    document.getElementById('checkout').min = minStr;
-    const checkout = document.getElementById('checkout').value;
-    if (checkout && checkout <= checkin) {
-      document.getElementById('checkout').value = minStr;
-    }
+// Latest possible check-out for a given check-in: the first taken night
+// after it. Guests may leave on the morning the next guest arrives.
+function latestCheckout(checkin) {
+  const d = parseYmd(checkin);
+  for (let i = 0; i < 366; i++) {
+    d.setDate(d.getDate() + 1);
+    if (isDateBlocked(localYmd(d))) break;
   }
-
-  updateSummary();
-  checkAvailability();
+  return localYmd(d);
 }
 
+// What clicking a day would do right now
+//   past | blocked | short (under the minimum stay) | in (sets check-in) | out (sets check-out)
+function dayRole(ds) {
+  if (ds < localYmd(new Date())) return 'past';
+  const choosingOut = sel.in && !sel.out;
+  if (choosingOut && ds > sel.in && ds <= latestCheckout(sel.in)) {
+    const nights = nightsBetween(parseYmd(sel.in), parseYmd(ds));
+    return nights >= minNights() ? 'out' : 'short';
+  }
+  return isDateBlocked(ds) ? 'blocked' : 'in';
+}
+
+// ── Calendar rendering ────────────────────────────────────────
+
+function monthHtml(year, month) {
+  const first = new Date(year, month, 1);
+  const days  = new Date(year, month + 1, 0).getDate();
+  const lead  = (first.getDay() + 6) % 7; // Monday first
+  const todayStr = localYmd(new Date());
+
+  let cells = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => `<div class="dow">${d}</div>`).join('');
+  cells += '<div></div>'.repeat(lead);
+  for (let d = 1; d <= days; d++) {
+    const ds = localYmd(new Date(year, month, d));
+    cells += `<button type="button" class="day${ds === todayStr ? ' is-today' : ''}" data-date="${ds}">${d}</button>`;
+  }
+  return `<div class="month">
+    <div class="month-title">${MONTHS[month]} ${year}</div>
+    <div class="month-grid">${cells}</div>
+  </div>`;
+}
+
+function renderMonths() {
+  const next = new Date(viewYear, viewMonth + 1, 1);
+  $('months').innerHTML = monthHtml(viewYear, viewMonth) + monthHtml(next.getFullYear(), next.getMonth());
+
+  const now = new Date();
+  const ahead = (viewYear - now.getFullYear()) * 12 + viewMonth - now.getMonth();
+  $('cal-prev').disabled = ahead <= 0;
+  $('cal-next').disabled = ahead >= MAX_MONTHS_AHEAD;
+  paintDays();
+}
+
+// Apply availability and selection state to the rendered day buttons
+function paintDays() {
+  const out = sel.out || previewOut;
+  document.querySelectorAll('#months .day').forEach(btn => {
+    const ds   = btn.dataset.date;
+    const role = dayRole(ds);
+    const date = parseYmd(ds);
+    btn.disabled = role === 'past' || role === 'blocked' || role === 'short';
+    btn.classList.toggle('is-blocked', role === 'blocked');
+    btn.classList.toggle('is-short',   role === 'short');
+    btn.classList.toggle('is-in',      ds === sel.in);
+    btn.classList.toggle('has-out',    ds === sel.in && !!out);
+    btn.classList.toggle('is-out',     !!out && ds === out);
+    btn.classList.toggle('in-range',   !!sel.in && !!out && ds > sel.in && ds < out);
+    btn.title = role === 'short' ? `${minNights()}-night minimum` : '';
+    btn.setAttribute('aria-label', `${fmtDay(date)} ${date.getFullYear()}` + (
+      ds === sel.in ? ', check-in' : ds === sel.out ? ', check-out'
+      : role === 'blocked' ? ', unavailable'
+      : role === 'short'   ? `, below the ${minNights()}-night minimum`
+      : role === 'out'     ? ', choose as check-out' : ''));
+  });
+}
+
+function shiftMonth(dir) {
+  const d = new Date(viewYear, viewMonth + dir, 1);
+  viewYear = d.getFullYear(); viewMonth = d.getMonth();
+  renderMonths();
+}
+$('cal-prev').onclick = () => shiftMonth(-1);
+$('cal-next').onclick = () => shiftMonth(1);
+
+$('months').addEventListener('click', e => {
+  const btn = e.target.closest('.day');
+  if (!btn || btn.disabled) return;
+  const ds = btn.dataset.date;
+  if (dayRole(ds) === 'out') {
+    sel.out = ds;
+  } else {
+    sel.in = ds; sel.out = '';
+  }
+  previewOut = '';
+  onDatesChange();
+  // Re-rendering state must not drop keyboard focus
+  const again = document.querySelector(`#months .day[data-date="${ds}"]`);
+  if (again) again.focus({ preventScroll: true });
+});
+
+// Arrow keys move between selectable days, turning the page when needed
+$('months').addEventListener('keydown', e => {
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+  const btn  = e.target.closest('.day');
+  if (!step || !btn) return;
+  e.preventDefault();
+  const d = parseYmd(btn.dataset.date);
+  for (let i = 0; i < 62; i++) {
+    d.setDate(d.getDate() + step);
+    const find = () => document.querySelector(`#months .day[data-date="${localYmd(d)}"]`);
+    let target = find();
+    // Not rendered, or in the second month that is hidden on small screens
+    if (!target || target.offsetParent === null) {
+      const nav = $(step > 0 ? 'cal-next' : 'cal-prev');
+      if (nav.disabled) return;
+      shiftMonth(step > 0 ? 1 : -1);
+      target = find();
+      if (!target) return;
+    }
+    if (!target.disabled) { target.focus(); return; }
+  }
+});
+
+// Preview the range while choosing a check-out
+function setPreview(ds) {
+  const next = ds && dayRole(ds) === 'out' ? ds : '';
+  if (next !== previewOut) { previewOut = next; paintDays(); }
+}
+$('months').addEventListener('mouseover', e => {
+  const btn = e.target.closest('.day');
+  setPreview(btn ? btn.dataset.date : '');
+});
+$('months').addEventListener('mouseleave', () => setPreview(''));
+$('months').addEventListener('focusin', e => {
+  const btn = e.target.closest('.day');
+  setPreview(btn ? btn.dataset.date : '');
+});
+
+$('clear-dates').onclick = () => {
+  sel.in = sel.out = previewOut = '';
+  onDatesChange();
+};
+
+// ── State → UI ────────────────────────────────────────────────
+
+function onDatesChange() {
+  $('checkin').value  = sel.in;
+  $('checkout').value = sel.out;
+  paintDays();
+  updateState();
+}
+
+// True when the selected stay is complete and bookable
 function checkAvailability() {
-  const checkin  = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-  const msg       = document.getElementById('avail-msg');
-  const guestForm = document.getElementById('guest-form');
-  const step2     = document.getElementById('step2');
-  const step3     = document.getElementById('step3');
+  const { in: checkin, out: checkout } = sel;
+  if (!checkin || !checkout || checkout <= checkin) return false;
+  const nights = nightsBetween(parseYmd(checkin), parseYmd(checkout));
+  if (nights < minNights()) return false;
+  return !datesInRange(checkin, checkout).some(isDateBlocked);
+}
 
-  if (!checkin || !checkout || checkout <= checkin) {
-    msg.className = 'avail-msg';
-    guestForm.style.display = 'none';
-    step2.className = 'step';
-    step3.className = 'step';
-    return;
-  }
+function updateState() {
+  const msg  = $('avail-msg');
+  const form = $('guest-form');
+  const ok   = checkAvailability();
 
-  const nights = nightsBetween(
-    parseYmd(checkin),
-    parseYmd(checkout)
-  );
+  $('sum-in').textContent  = sel.in  ? fmtDay(parseYmd(sel.in))  : 'Add date';
+  $('sum-out').textContent = sel.out ? fmtDay(parseYmd(sel.out)) : 'Add date';
+  $('sum-in').classList.toggle('empty', !sel.in);
+  $('sum-out').classList.toggle('empty', !sel.out);
+  $('clear-dates').hidden = !sel.in;
 
-  if (property.min_nights && nights < property.min_nights) {
-    msg.className   = 'avail-msg unavailable';
-    msg.textContent = `Minimum stay is ${property.min_nights} night${property.min_nights > 1 ? 's' : ''}.`;
-    guestForm.style.display = 'none';
-    return;
-  }
-
-  const conflicting = datesInRange(checkin, checkout).filter(isDateBlocked);
-  if (conflicting.length > 0) {
+  if (ok) {
+    const nights = nightsBetween(parseYmd(sel.in), parseYmd(sel.out));
+    msg.className   = 'avail-msg available';
+    msg.textContent = `✓ Available — ${fmtDay(parseYmd(sel.in))} to ${fmtDay(parseYmd(sel.out))}, ${plural(nights, 'night')}`;
+  } else if (sel.in && sel.out) {
     msg.className   = 'avail-msg unavailable';
     msg.textContent = 'Sorry, these dates are not available. Please choose different dates.';
-    guestForm.style.display = 'none';
-    step2.className = 'step';
-    step3.className = 'step';
+  } else if (sel.in) {
+    msg.className   = 'avail-msg';
+    msg.textContent = 'Now select your check-out date'
+      + (minNights() > 1 ? ` — ${minNights()}-night minimum.` : '.');
   } else {
-    msg.className   = 'avail-msg available';
-    msg.textContent = `✓ Available for ${nights} night${nights > 1 ? 's' : ''}! Fill in your details below.`;
-    guestForm.style.display = 'block';
-    step2.className = 'step done';
-    step3.className = 'step active';
+    msg.className   = 'avail-msg';
+    msg.textContent = 'Select your check-in date.';
   }
+
+  form.classList.toggle('locked', !ok);
+  form.inert = !ok;
+  updateSummary();
 }
 
 // ── Pricing summary ───────────────────────────────────────────
 
-function updateSummary() {
-  const checkin  = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-  const lines    = document.getElementById('summary-lines');
-  const empty    = document.getElementById('summary-empty');
+function stayTotal() {
+  if (!sel.in || !sel.out) return null;
+  const nights = nightsBetween(parseYmd(sel.in), parseYmd(sel.out));
+  return { nights, total: property.nightly_rate > 0 ? property.nightly_rate * nights : null };
+}
 
-  if (!checkin || !checkout || checkout <= checkin) {
+function updateSummary() {
+  const lines = $('summary-lines');
+  const empty = $('summary-empty');
+  const stay  = stayTotal();
+
+  if (!stay || stay.nights <= 0) {
     lines.style.display = 'none';
     empty.style.display = 'block';
     return;
   }
-
-  const nights = nightsBetween(
-    parseYmd(checkin),
-    parseYmd(checkout)
-  );
   empty.style.display = 'none';
 
-  if (property.nightly_rate > 0) {
-    const total = property.nightly_rate * nights;
-    document.getElementById('sl-nights').textContent = `${nights} night${nights > 1 ? 's' : ''} × ${fmtCurrency(property.nightly_rate)}`;
-    document.getElementById('sl-total').textContent  = fmtCurrency(total);
+  if (stay.total !== null) {
+    $('sl-nights').textContent = `${fmtCurrency(property.nightly_rate)} × ${plural(stay.nights, 'night')}`;
+    $('sl-rate').textContent   = fmtCurrency(stay.total);
+    $('sl-total').textContent  = fmtCurrency(stay.total);
   } else {
-    document.getElementById('sl-nights').textContent = `${nights} night${nights > 1 ? 's' : ''}`;
-    document.getElementById('sl-total').textContent  = 'Contact for pricing';
+    $('sl-nights').textContent = plural(stay.nights, 'night');
+    $('sl-rate').textContent   = '';
+    $('sl-total').textContent  = 'Contact for pricing';
   }
   lines.style.display = 'flex';
 }
 
 // ── Form submission ───────────────────────────────────────────
 
+function showFormError(text, field) {
+  const errEl = $('form-error');
+  errEl.textContent = text;
+  errEl.className   = 'error-msg show';
+  if (field) { field.setAttribute('aria-invalid', 'true'); field.focus(); }
+}
+
+['g-name', 'g-email'].forEach(id =>
+  $(id).addEventListener('input', e => e.target.removeAttribute('aria-invalid')));
+
 async function submitBooking() {
-  const btn    = document.getElementById('submit-btn');
-  const errEl  = document.getElementById('form-error');
-  errEl.className = 'error-msg';
+  const btn = $('submit-btn');
+  $('form-error').className = 'error-msg';
 
-  const name     = document.getElementById('g-name').value.trim();
-  const email    = document.getElementById('g-email').value.trim();
-  const phone    = document.getElementById('g-phone').value.trim();
-  const message  = document.getElementById('g-message').value.trim();
-  const checkin  = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-  const guests   = document.getElementById('guests').value;
+  const name     = $('g-name').value.trim();
+  const email    = $('g-email').value.trim();
+  const phone    = $('g-phone').value.trim();
+  const message  = $('g-message').value.trim();
+  const checkin  = $('checkin').value;
+  const checkout = $('checkout').value;
+  const guests   = $('guests').value;
 
-  if (!name || !email) {
-    errEl.textContent = 'Please fill in your name and email address.';
-    errEl.className   = 'error-msg show';
-    return;
-  }
+  if (!name)  return showFormError('Please enter your name.', $('g-name'));
+  if (!email) return showFormError('Please enter your email address.', $('g-email'));
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errEl.textContent = 'Please enter a valid email address.';
-    errEl.className   = 'error-msg show';
-    return;
+    return showFormError('Please enter a valid email address.', $('g-email'));
   }
 
   btn.disabled    = true;
   btn.textContent = 'Sending…';
-  document.getElementById('step3').className = 'step done';
 
   try {
     const res  = await fetch('/api/book', {
@@ -218,15 +373,20 @@ async function submitBooking() {
     if (!res.ok || !data.success) throw new Error(data.error || 'Booking failed');
 
     // Show success screen
-    document.querySelector('.page').style.display          = 'none';
-    document.getElementById('success-screen').style.display = 'block';
-    document.getElementById('conf-email').textContent      = email;
-    document.getElementById('conf-ref').textContent        = 'Reference: ' + data.booking.uid;
+    const stay = stayTotal();
+    $('page').style.display           = 'none';
+    $('success-screen').style.display = 'block';
+    $('conf-email').textContent       = email;
+    $('conf-ref').textContent         = 'Reference: ' + data.booking.uid;
+    $('conf-stay').innerHTML = `
+      <div><dt>Check-in</dt><dd>${fmtDay(parseYmd(checkin))}</dd></div>
+      <div><dt>Check-out</dt><dd>${fmtDay(parseYmd(checkout))}</dd></div>
+      <div><dt>Stay</dt><dd>${plural(stay.nights, 'night')} · ${plural(+guests, 'guest')}</dd></div>`;
+    $('success-screen').scrollIntoView({ block: 'start' });
   } catch(e) {
-    errEl.textContent = e.message || 'Something went wrong. Please try again.';
-    errEl.className   = 'error-msg show';
-    btn.disabled      = false;
-    btn.textContent   = 'Request Booking';
+    showFormError(e.message || 'Something went wrong. Please try again.');
+    btn.disabled    = false;
+    btn.textContent = 'Request booking';
   }
 }
 

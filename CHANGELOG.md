@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Dashboard redesign** — new "today" briefing with a plain-language summary, a 30-night occupancy strip, and a per-property stay timeline (bars coloured by platform; overlapping entries stack). Clicking a timeline bar jumps to its booking card; hovering a card spotlights its bar.
+- **Booking cards** — check-in date tile, weekday dates, relative status ("In 5 days", "In house · 2 nights left"), and today's departures and arrivals listed first
+- **Month calendar** — consecutive nights join into one run, overlaps show both platform colours, hover for guest names
+- **Guest booking page redesign** — illustrated hero when no photo is set, inline two-month availability calendar with range selection (taken dates struck through, minimum stay enforced as you pick), guest stepper, and a stay summary on the confirmation screen
+- New type and colour system shared by both pages; layouts adapt down to phone width and respect reduced-motion settings
+- **Keyboard support** — arrow keys move between days in the guest availability calendar; the delete dialog keeps Tab inside it and returns focus when closed
+
+### Fixed
+- Guest names were blank on dashboard booking cards
+- Delete button no longer builds inline handlers from guest names
+
+---
+
 ## [1.3.0] — 2026-07-17
 
 ### Added
