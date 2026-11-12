@@ -189,6 +189,56 @@ function countTurnaroundsInMonth(turnarounds, year, monthIndex, propertyId = 'al
   return count;
 }
 
+// ── Direct bookings blocked on the platforms? ───────────────
+// A direct booking only exists in StayView, so its nights have to be
+// blocked on each platform by hand (#77). The platforms import each other's
+// calendars, so a block made on one normally reaches the others.
+
+// Platforms StayView can't check. Booking.com's export leaves out dates it
+// closed through a calendar import, and labels everything it does export
+// "CLOSED - Not available", so a closure made by hand looks like a booking.
+const PLATFORMS_NOT_CHECKED = ['booking'];
+
+// For each direct booking with nights from `from` onwards, compare those
+// nights with each platform's feed for the same property:
+//   missing   — nights the platform doesn't show as taken yet
+//   conflicts — nights where the platform has its own booking (a likely
+//               double booking, not a block)
+// platformsFor(propertyId) lists the platforms configured for a property.
+// Returns [{ booking, checked: [platform], missing: { platform: [dateStr] },
+//            conflicts: { platform: [dateStr] } }]
+function checkDirectBookingsBlocked(bookings, platformsFor, from = today()) {
+  const blockedOn = new Map();  // "propertyId:platform" -> Set of nights blocked there
+  const bookedOn  = new Map();  // "propertyId:platform" -> Set of nights booked there
+  for (const b of bookings) {
+    if (b.source === 'direct') continue;
+    const key = `${b.propertyId}:${b.source}`;
+    const target = b.isBlocked ? blockedOn : bookedOn;
+    if (!target.has(key)) target.set(key, new Set());
+    datesInRange(b.start, b.end).forEach(d => target.get(key).add(d));
+  }
+  const fromStr = localYmd(from);
+  const results = [];
+  for (const b of bookings) {
+    if (b.source !== 'direct') continue;
+    const nights = datesInRange(b.start, b.end).filter(d => d >= fromStr);
+    if (nights.length === 0) continue;
+    const checked = platformsFor(b.propertyId)
+      .filter(p => p !== 'direct' && !PLATFORMS_NOT_CHECKED.includes(p));
+    const missing = {}, conflicts = {};
+    for (const p of checked) {
+      const blocked = blockedOn.get(`${b.propertyId}:${p}`) || new Set();
+      const booked  = bookedOn.get(`${b.propertyId}:${p}`)  || new Set();
+      const clash = nights.filter(d => booked.has(d));
+      const gaps  = nights.filter(d => !booked.has(d) && !blocked.has(d));
+      if (clash.length) conflicts[p] = clash;
+      if (gaps.length)  missing[p]   = gaps;
+    }
+    results.push({ booking: b, checked, missing, conflicts });
+  }
+  return results;
+}
+
 // ── iCal parsing ──────────────────────────────────────────────
 
 // Unfold iCal line continuations (CRLF or LF followed by space/tab)
@@ -297,5 +347,5 @@ function escHtml(s) {
 // ── Node export ───────────────────────────────────────────────
 // Lets server.js reuse the iCal parser. No-op in the browser.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, datesInRange, fmtFull, SOURCE_LABELS, TURNAROUND_GAP_DAYS, findTurnarounds, turnaroundOn, hasTurnaroundOn, countTurnaroundsInMonth };
+  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, datesInRange, fmtFull, SOURCE_LABELS, PLATFORMS_NOT_CHECKED, checkDirectBookingsBlocked, TURNAROUND_GAP_DAYS, findTurnarounds, turnaroundOn, hasTurnaroundOn, countTurnaroundsInMonth };
 }

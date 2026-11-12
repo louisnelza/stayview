@@ -15,6 +15,76 @@ let currentProperty  = 'all'; // 'all' or property id (number)
 // ── Turnaround state ──────────────────────────────────────────
 let turnaroundDays   = new Map(); // Map of propertyId -> Map of dateStr -> { type, propertyId }
 
+// ── Direct bookings blocked on the platforms? (#77) ───────────
+let blockChecks = new Map(); // direct booking -> result of checkDirectBookingsBlocked
+
+// Platforms configured for a property, from /config. Demo properties have no
+// config, so use the platforms that appear in their bookings.
+function platformsFor(propertyId) {
+  const p = properties.find(x => x.id === propertyId);
+  if (p && Array.isArray(p.platforms)) return p.platforms;
+  return [...new Set(allBookings.filter(b => b.propertyId === propertyId && b.source !== 'direct').map(b => b.source))].sort();
+}
+
+function refreshBlockChecks() {
+  blockChecks = new Map(checkDirectBookingsBlocked(allBookings, platformsFor).map(c => [c.booking, c]));
+}
+
+// "Airbnb", "Airbnb and Lekkeslaap", "Airbnb, Booking.com and Lekkeslaap"
+function platformNames(list) {
+  const names = list.map(p => SOURCE_LABELS[p] || p);
+  return names.length < 2 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+}
+
+// " (Fri 13 Nov)" when only some of the booking's remaining nights are affected
+function someNights(dates, check) {
+  const remaining = datesInRange(check.booking.start, check.booking.end).filter(d => d >= localYmd(today())).length;
+  return dates.length < remaining ? ` (${dates.map(d => fmtDay(parseYmd(d))).join(', ')})` : '';
+}
+
+// One line per problem: platforms still to block, and platforms with their own booking
+function blockCheckProblems(check) {
+  const lines = [];
+  for (const [p, dates] of Object.entries(check.conflicts)) {
+    lines.push({ conflict: true, text: `${SOURCE_LABELS[p] || p} has its own booking on ${dates.length === 1 ? 'this night' : 'these nights'}${someNights(dates, check)} — possible double booking` });
+  }
+  // Group platforms missing the same nights into one line
+  const byNights = new Map();
+  for (const [p, dates] of Object.entries(check.missing)) {
+    const key = dates.join(',');
+    if (!byNights.has(key)) byNights.set(key, { dates, platforms: [] });
+    byNights.get(key).platforms.push(p);
+  }
+  for (const { dates, platforms } of byNights.values()) {
+    lines.push({ conflict: false, text: `Not yet blocked on ${platformNames(platforms)}${someNights(dates, check)}` });
+  }
+  return lines;
+}
+
+function renderBlockCheckNotice() {
+  const area = document.getElementById('block-check-area');
+  const visible = new Set(visibleBookings());
+  const flagged = [...blockChecks.values()]
+    .filter(c => visible.has(c.booking) && (Object.keys(c.missing).length || Object.keys(c.conflicts).length))
+    .sort((a, b) => a.booking.start - b.booking.start);
+  if (flagged.length === 0) { area.innerHTML = ''; return; }
+  const anyConflict = flagged.some(c => Object.keys(c.conflicts).length);
+  const skipsBooking = flagged.some(c => platformsFor(c.booking.propertyId).includes('booking'));
+  const items = flagged.map(c => {
+    const b = c.booking;
+    const where = currentProperty === 'all' && properties.length > 1 ? ` · ${escHtml(propertyName(b.propertyId))}` : '';
+    const lines = blockCheckProblems(c).map(l => `<span class="${l.conflict ? 'is-conflict' : ''}">${escHtml(l.text)}</span>`).join('<br>');
+    return `<li><strong>${escHtml(b.summary || 'Direct booking')}</strong> · ${fmtDay(b.start)} → ${fmtDay(b.end)}${where}<br>${lines}</li>`;
+  }).join('');
+  area.innerHTML = `
+    <div class="error-box notice-box${anyConflict ? ' has-conflict' : ''}" role="status">
+      ${icon('alert')}
+      <div class="error-title">${flagged.length === 1 ? 'A direct booking needs' : `${flagged.length} direct bookings need`} blocking on the platforms</div>
+      <ul>${items}</ul>
+      <p>Block the nights on one platform; the others pick it up when they sync. This updates when StayView next reads the calendars.${skipsBooking ? ' Booking.com can’t be checked — its calendar doesn’t list dates it closed through a sync.' : ''}</p>
+    </div>`;
+}
+
 // Gap threshold per property comes from /config; demo properties use the default
 function refreshTurnarounds() {
   turnaroundDays = findTurnarounds(allBookings, id => {
@@ -307,6 +377,8 @@ function setProperty(id, el) {
 }
 
 function renderAll() {
+  refreshBlockChecks();
+  renderBlockCheckNotice();
   updateStats();
   renderTimeline();
   renderBookings();
@@ -554,6 +626,14 @@ function renderBookings() {
         html += `<div class="turnaround-banner">${icon('arrive')}New guest arriving — confirm the unit is serviced and ready</div>`;
       }
     }
+    // Direct booking not blocked on every platform yet (#77)
+    const blockCheck = isDirect ? blockChecks.get(b) : null;
+    if (blockCheck) {
+      for (const line of blockCheckProblems(blockCheck)) {
+        html += `<div class="turnaround-banner block-banner${line.conflict ? ' is-conflict' : ''}">${icon('alert')}${escHtml(line.text)}</div>`;
+      }
+    }
+    const blockedEverywhere = blockCheck && blockCheck.checked.length > 0 && blockCheckProblems(blockCheck).length === 0;
 
     // In 'all' view, show a single "Blocked dates" label before the first blocked entry
     if (b.isBlocked && currentView === 'all' && !blockedSectionShown) {
@@ -586,6 +666,7 @@ function renderBookings() {
             <span class="badge badge-src">${escHtml(srcLabel)}</span>
             ${b.isBlocked ? '' : `<span class="badge badge-${status}">${statusLabel(b, status)}</span>`}
             ${b.provisional ? '<span class="badge badge-provisional">Provisional</span>' : ''}
+            ${blockedEverywhere ? `<span class="badge badge-blocked-ok">Blocked on ${escHtml(platformNames(blockCheck.checked))}</span>` : ''}
             ${propName ? `<span class="badge badge-property">${escHtml(propName)}</span>` : ''}
           </div>
           ${extraDetails}
