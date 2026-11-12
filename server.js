@@ -583,7 +583,10 @@ async function handleRequest(req, res) {
     const rawInterval = process.env.POLL_INTERVAL_MINUTES;
     const pollMinutes = rawInterval !== undefined ? parseInt(rawInterval) : 120;
     const pollIntervalMs = pollMinutes > 0 ? pollMinutes * 60 * 1000 : 0;
-    const properties = getProperties().map(p => ({ id: p.id, name: p.name, location: p.location, turnaroundGapDays: p.turnaroundGapDays }));
+    const properties = getProperties().map(p => ({
+      id: p.id, name: p.name, location: p.location, turnaroundGapDays: p.turnaroundGapDays,
+      platforms: Object.keys(p.sources).filter(k => p.sources[k]),
+    }));
     // Collect all active platform names across all properties
     const activePlatforms = [...new Set(
       getProperties().flatMap(p => Object.entries(p.sources)

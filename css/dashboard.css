@@ -512,6 +512,13 @@ main { padding: 0 32px 72px; max-width: 1400px; margin: 0 auto; }
 .error-box li + li { margin-top: 2px; }
 .error-box strong { color: var(--text); font-weight: 500; }
 .error-box p { grid-column: 2; }
+/* Direct bookings still to block on the platforms (#77) */
+.notice-box { background: rgba(240, 228, 201, .06); border-color: rgba(240, 228, 201, .3); }
+.notice-box svg { color: var(--cream); }
+.notice-box.has-conflict svg, .notice-box .is-conflict { color: var(--danger); }
+.notice-box li + li { margin-top: 8px; }
+.block-banner.is-conflict { color: var(--danger); border-color: rgba(255, 138, 128, .45); background: rgba(255, 138, 128, .07); }
+.badge-blocked-ok { background: transparent; box-shadow: inset 0 0 0 1px rgba(99, 216, 166, .45); color: var(--ok); }
 .error-box code { font-family: var(--font-mono); font-size: 12.5px; background: rgba(0, 0, 0, .35); padding: 2px 7px; border-radius: 5px; color: var(--text); }
 
 .empty {

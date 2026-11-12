@@ -18,6 +18,7 @@ A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com*
 - **Multi-property** — manage multiple rentals from one dashboard with a property switcher
 - **Direct booking engine** — guest-facing `/book` page so guests can book without platform commissions
 - **Manual booking capture** — add walk-in or phone bookings directly to the dashboard
+- **Platform block check** — warns when a direct booking's nights aren't blocked on Airbnb or Lekkeslaap yet, or clash with a booking there ([details](#blocking-direct-bookings-on-the-platforms))
 - **Today briefing** — a one-line summary of today's arrivals, departures and same-day turnarounds
 - **Stay timeline** — one row per property, one bar per stay, colour-coded by platform; click a bar to jump to its booking
 - **Calendar view** — colour-coded by platform with turnaround day indicators
@@ -130,6 +131,20 @@ To manually capture a walk-in or phone booking, add an entry to `bookings.json` 
 ```
 
 Click **Refresh** in the dashboard header to load the new booking. Direct bookings appear in purple and can be deleted from the dashboard with the bin button on their card.
+
+### Blocking direct bookings on the platforms
+
+A direct booking only exists in StayView — Airbnb, Booking.com and Lekkeslaap don't know about it, so block its nights on the platforms yourself. If your platforms import each other's calendars, blocking on one is usually enough: the others pick it up when they next sync, typically within a few hours.
+
+The dashboard checks this for you. For every upcoming direct booking it compares the nights with each platform's calendar and shows:
+
+| Shown | Meaning |
+|---|---|
+| **Not yet blocked on …** | The platform's calendar doesn't show those nights as taken yet. Block them, or wait for the platforms to sync |
+| **… has its own booking on this night — possible double booking** (red) | The platform has a guest booked on a night the direct booking also uses |
+| **Blocked on Airbnb and Lekkeslaap** (green badge) | Every platform StayView can check shows the nights as taken |
+
+Booking.com can't be checked: its calendar doesn't list dates it closed through a sync with another platform, and it labels everything it does list as "CLOSED - Not available". The check updates whenever StayView reads the calendars again — click **Refresh** after blocking. See [#77](https://github.com/louisnelza/stayview/issues/77) for options to make blocking automatic.
 
 If `bookings.json` can't be read after an edit — a missing comma, a stray bracket, or anything that isn't a list of bookings — StayView pauses direct bookings rather than risk overwriting the file. The dashboard shows a warning, guests are asked to try again later, and the file is left exactly as it is. Fix the mistake (a JSON validator will point to it) and click **Refresh**.
 

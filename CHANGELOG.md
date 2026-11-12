@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Platform block check for direct bookings** — the dashboard warns when an upcoming direct booking's nights aren't blocked on Airbnb or Lekkeslaap yet, and flags in red any night where a platform has its own booking (a likely double booking). Bookings blocked everywhere StayView can check get a green badge. Booking.com isn't checked, because its calendar leaves out dates closed through a sync — #77
 - **Turnaround gap per property** — `PROPERTY_N_TURNAROUND_GAP_DAYS` (or `TURNAROUND_GAP_DAYS` in the single-property format) sets how soon after a checkout an arrival triggers the "New guest arriving — confirm the unit is serviced and ready" reminder. Default 3 days; 0 turns the reminder off
 - **Turnarounds this month** — a fourth figure in the occupancy panel, following the property switcher. On phones the four figures sit two by two
 
