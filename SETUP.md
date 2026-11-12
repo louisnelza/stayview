@@ -25,6 +25,16 @@ ICAL_LEKKESLAAP=https://www.lekkeslaap.co.za/suppliers/icalendar.ics?t=...
 
 Only fill in the platforms you use. Leave the others blank.
 
+### Optional: turnaround reminders
+
+The dashboard shows a "New guest arriving — confirm the unit is serviced and ready" reminder when a guest checks in within 3 days of the previous checkout. To change the number of days, add this line to `config.txt`:
+
+```
+TURNAROUND_GAP_DAYS=3
+```
+
+Use 0 to turn this reminder off. Checkout-day and same-day turnaround reminders always appear. After changing it, save `config.txt` and reload the dashboard page in your browser (the Refresh button doesn't pick up this setting). See the README for more.
+
 ### Where to find your iCal URLs
 
 **Airbnb**

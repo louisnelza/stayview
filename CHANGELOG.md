@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Turnaround gap per property** — `PROPERTY_N_TURNAROUND_GAP_DAYS` (or `TURNAROUND_GAP_DAYS` in the single-property format) sets how soon after a checkout an arrival triggers the "New guest arriving — confirm the unit is serviced and ready" reminder. Default 3 days; 0 turns the reminder off
+- **Turnarounds this month** — a fourth figure in the occupancy panel, following the property switcher. On phones the four figures sit two by two
+
 ### Fixed
 - **Turnarounds mixed up between properties** — turnaround days were tracked one per date across all properties, so with more than one property a checkout could hide another property's same-day swap, a "new guest arriving" reminder could be dropped, and the month calendar could show a turnaround dot belonging to a property that wasn't selected. Turnarounds are now tracked per property — closes #61
 

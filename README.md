@@ -22,8 +22,8 @@ A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com*
 - **Stay timeline** — one row per property, one bar per stay, colour-coded by platform; click a bar to jump to its booking
 - **Calendar view** — colour-coded by platform with turnaround day indicators
 - **Granular booking status** — Arrives today / In house / Leaves today / In N days / Past
-- **Turnaround day indicator** — flags same-day checkout + checkin between bookings
-- **30-day occupancy stats** — night-by-night occupancy strip, guests in house, upcoming arrivals
+- **Turnaround reminders** — banners and calendar dots for checkout days, same-day swaps (one guest leaves, the next arrives) and arrivals soon after a checkout, tracked per property ([details](#turnaround-reminders))
+- **Occupancy stats** — night-by-night occupancy strip for the next 30 days, guests in house, upcoming arrivals and turnarounds this month
 - **Platform filters** — only shows filters for platforms you have configured, plus direct bookings
 - **Auto-refresh** — server-side polling keeps data current without manual refresh
 - **Platform downtime resilience** — cached iCal data served when a platform is temporarily unavailable
@@ -61,6 +61,7 @@ PROPERTY_1_NIGHTLY_RATE=1200
 PROPERTY_1_CURRENCY=ZAR
 PROPERTY_1_MIN_NIGHTS=2
 PROPERTY_1_MAX_GUESTS=8
+PROPERTY_1_TURNAROUND_GAP_DAYS=3
 
 # Add a second property by uncommenting and filling in:
 # PROPERTY_2_NAME=Durban City Apartment
@@ -72,6 +73,20 @@ POLL_INTERVAL_MINUTES=120
 ```
 
 Legacy single-property format still works too — see `.env.example` for details.
+
+#### Turnaround reminders
+
+The dashboard marks the days a unit needs attention between guests, with a dot on the calendar and a banner above the booking on the day:
+
+| Reminder | When it appears |
+|---|---|
+| **Same-day turnaround** | One guest checks out and the next checks in on the same day |
+| **Checkout today** | A guest checks out and nobody arrives that day — clean and prepare the unit |
+| **New guest arriving** | A guest checks in a few days after the previous checkout — confirm the unit is still serviced and ready |
+
+How many days counts as "a few" is the **turnaround gap**, set per property with `PROPERTY_1_TURNAROUND_GAP_DAYS`, `PROPERTY_2_TURNAROUND_GAP_DAYS` and so on (`TURNAROUND_GAP_DAYS` in the single-property format). With the default of 3, an arrival up to 3 days after a checkout gets the reminder; a longer gap does not. Use a smaller number for a unit that stays clean when empty, a larger one for a unit that needs airing or a top-up clean after standing empty for a while, or 0 to turn this reminder off. Whole numbers from 0 to 30 are accepted; anything else falls back to 3. The other two reminders always appear. After changing the gap, reload the dashboard page — the Refresh button re-fetches calendars but not settings.
+
+The **Turnarounds this month** figure counts all three kinds for the current calendar month, for the property selected in the switcher.
 
 > Your `.env` file is listed in `.gitignore` and will never be committed.
 

@@ -92,13 +92,15 @@ function getStatus(b) {
 // Three cases, in order of precedence:
 //   1. Same-day swap — one booking ends, another starts same day
 //   2. Checkout day — any booking ending (unit always needs cleaning)
-//   3. Checkin after gap — a booking starts within GAP_DAYS of a
-//      previous booking ending (unit may need refreshing)
+//   3. Checkin after gap — a booking starts within the property's gap
+//      threshold of a previous booking ending (unit may need refreshing).
+//      The threshold defaults to TURNAROUND_GAP_DAYS; 0 turns this case off.
 // Turnarounds are tracked per property, so two properties with activity
 // on the same date never overwrite each other.
 const TURNAROUND_GAP_DAYS = 3;
 
-function findTurnarounds(bookings) {
+// gapDaysFor(propertyId) returns that property's gap threshold in days.
+function findTurnarounds(bookings, gapDaysFor = () => TURNAROUND_GAP_DAYS) {
   // Returns Map of propertyId -> Map of dateStr -> { type: 'swap'|'checkout'|'checkin', propertyId }
   const byProperty = new Map();
   for (const bk of bookings) {
@@ -109,6 +111,7 @@ function findTurnarounds(bookings) {
 
   const turnarounds = new Map();
   for (const [propertyId, real] of byProperty) {
+    const gapDays = gapDaysFor(propertyId);
     const days = new Map();
     turnarounds.set(propertyId, days);
 
@@ -134,7 +137,7 @@ function findTurnarounds(bookings) {
       // Case 3: checkin within GAP_DAYS of a previous checkout.
       // Stepping by calendar day keeps this correct across DST changes.
       if (days.has(startStr)) continue;
-      for (let gap = 1; gap <= TURNAROUND_GAP_DAYS; gap++) {
+      for (let gap = 1; gap <= gapDays; gap++) {
         const d = new Date(bk.start);
         d.setDate(d.getDate() - gap);
         if (endsBefore(localYmd(d))) {
@@ -159,6 +162,20 @@ function hasTurnaroundOn(turnarounds, dateStr, propertyId = 'all') {
   if (propertyId !== 'all') return !!turnaroundOn(turnarounds, propertyId, dateStr);
   for (const days of turnarounds.values()) if (days.has(dateStr)) return true;
   return false;
+}
+
+// Number of turnarounds in a calendar month (monthIndex 0–11), for one
+// property or summed over all of them. Two properties turning over on the
+// same day count as two.
+function countTurnaroundsInMonth(turnarounds, year, monthIndex, propertyId = 'all') {
+  if (!(turnarounds instanceof Map)) return 0;
+  const prefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}-`;
+  let count = 0;
+  for (const [pid, days] of turnarounds) {
+    if (propertyId !== 'all' && pid !== propertyId) continue;
+    for (const dateStr of days.keys()) if (dateStr.startsWith(prefix)) count++;
+  }
+  return count;
 }
 
 // ── iCal parsing ──────────────────────────────────────────────
@@ -269,5 +286,5 @@ function escHtml(s) {
 // ── Node export ───────────────────────────────────────────────
 // Lets server.js reuse the iCal parser. No-op in the browser.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS, findTurnarounds, turnaroundOn, hasTurnaroundOn };
+  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS, TURNAROUND_GAP_DAYS, findTurnarounds, turnaroundOn, hasTurnaroundOn, countTurnaroundsInMonth };
 }
