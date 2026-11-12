@@ -61,6 +61,7 @@ PROPERTY_1_NIGHTLY_RATE=1200
 PROPERTY_1_CURRENCY=ZAR
 PROPERTY_1_MIN_NIGHTS=2
 PROPERTY_1_MAX_GUESTS=8
+PROPERTY_1_TURNAROUND_GAP_DAYS=3
 
 # Add a second property by uncommenting and filling in:
 # PROPERTY_2_NAME=Durban City Apartment
@@ -70,6 +71,8 @@ PROPERTY_1_MAX_GUESTS=8
 
 POLL_INTERVAL_MINUTES=120
 ```
+
+`TURNAROUND_GAP_DAYS` controls the "New guest arriving — confirm the unit is serviced and ready" reminder: it appears when a guest checks in within that many days of the previous checkout. Set it per property; 0 turns the reminder off, and the default is 3.
 
 Legacy single-property format still works too — see `.env.example` for details.
 

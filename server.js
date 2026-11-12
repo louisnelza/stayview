@@ -77,6 +77,23 @@ function loadConfig() {
   }
 }
 
+// Days between a checkout and the next check-in within which the dashboard
+// reminds the host to check the unit before the arrival. 0 turns these
+// reminders off. Blank or invalid values fall back to the default.
+const DEFAULT_TURNAROUND_GAP_DAYS = 3;
+const MAX_TURNAROUND_GAP_DAYS = 30;
+const warnedGapKeys = new Set();
+function turnaroundGapDays(key) {
+  const raw = (process.env[key] || "").trim();
+  if (raw === "") return DEFAULT_TURNAROUND_GAP_DAYS;
+  if (/^\d+$/.test(raw) && +raw <= MAX_TURNAROUND_GAP_DAYS) return +raw;
+  if (!warnedGapKeys.has(key)) {
+    warnedGapKeys.add(key);
+    console.warn(`[config] ${key}=${raw} is not a whole number from 0 to ${MAX_TURNAROUND_GAP_DAYS}; using ${DEFAULT_TURNAROUND_GAP_DAYS}`);
+  }
+  return DEFAULT_TURNAROUND_GAP_DAYS;
+}
+
 // Returns array of property objects from config.
 // Supports both legacy single-property format (ICAL_AIRBNB etc.)
 // and new multi-property format (PROPERTY_1_NAME, PROPERTY_1_AIRBNB etc.)
@@ -108,6 +125,7 @@ function getProperties() {
         minNights:   parseInt(process.env[`${prefix}MIN_NIGHTS`]     || "1"),
         maxGuests:   parseInt(process.env[`${prefix}MAX_GUESTS`]     || "10"),
         photoUrl:    process.env[`${prefix}PHOTO_URL`]     || "",
+        turnaroundGapDays: turnaroundGapDays(`${prefix}TURNAROUND_GAP_DAYS`),
         sources: { airbnb, booking, lekkeslaap },
       });
     }
@@ -135,6 +153,7 @@ function getProperties() {
         minNights:   parseInt(process.env.MIN_NIGHTS  || "1"),
         maxGuests:   parseInt(process.env.MAX_GUESTS  || "10"),
         photoUrl:    process.env.PROPERTY_PHOTO_URL   || "",
+        turnaroundGapDays: turnaroundGapDays("TURNAROUND_GAP_DAYS"),
         sources,
       });
     }
@@ -523,7 +542,7 @@ const server = http.createServer(async (req, res) => {
     const rawInterval = process.env.POLL_INTERVAL_MINUTES;
     const pollMinutes = rawInterval !== undefined ? parseInt(rawInterval) : 120;
     const pollIntervalMs = pollMinutes > 0 ? pollMinutes * 60 * 1000 : 0;
-    const properties = getProperties().map(p => ({ id: p.id, name: p.name, location: p.location }));
+    const properties = getProperties().map(p => ({ id: p.id, name: p.name, location: p.location, turnaroundGapDays: p.turnaroundGapDays }));
     // Collect all active platform names across all properties
     const activePlatforms = [...new Set(
       getProperties().flatMap(p => Object.entries(p.sources)

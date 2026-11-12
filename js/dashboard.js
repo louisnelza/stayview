@@ -15,6 +15,14 @@ let currentProperty  = 'all'; // 'all' or property id (number)
 // ── Turnaround state ──────────────────────────────────────────
 let turnaroundDays   = new Map(); // Map of propertyId -> Map of dateStr -> { type, propertyId }
 
+// Gap threshold per property comes from /config; demo properties use the default
+function refreshTurnarounds() {
+  turnaroundDays = findTurnarounds(allBookings, id => {
+    const days = (properties.find(p => p.id === id) || {}).turnaroundGapDays;
+    return Number.isInteger(days) && days >= 0 ? days : TURNAROUND_GAP_DAYS;
+  });
+}
+
 // ── Auto-refresh ──────────────────────────────────────────────
 let pollInterval    = null;   // setInterval handle
 let pollMs          = 0;      // 0 = disabled
@@ -97,7 +105,7 @@ async function loadAll(force = false) {
     } catch(e) { console.warn('Could not load direct bookings:', e); }
 
     allBookings.sort((a, b) => a.start - b.start);
-    turnaroundDays = findTurnarounds(allBookings);
+    refreshTurnarounds();
 
     if (warnings.length) {
       document.getElementById('error-area').innerHTML =
@@ -239,6 +247,7 @@ function updateStats() {
   setNumber(document.getElementById('s-total'), real.length);
   setNumber(document.getElementById('s-active'), active);
   setNumber(document.getElementById('s-upcoming'), up30);
+  setNumber(document.getElementById('s-turn'), countTurnaroundsInMonth(turnaroundDays, now.getFullYear(), now.getMonth(), currentProperty));
   setNumber(document.getElementById('s-occ'), occ);
   document.getElementById('s-occ-sub').textContent = bookedNights + ' of 30 nights booked';
   document.getElementById('night-strip').innerHTML = strip;
@@ -753,7 +762,7 @@ async function confirmDelete() {
     const deletedUid = pendingDeleteUid;
     closeDeleteModal();
     allBookings = allBookings.filter(b => b.uid !== deletedUid);
-    turnaroundDays = findTurnarounds(allBookings);
+    refreshTurnarounds();
     renderAll();
   } catch(e) {
     err.textContent = 'Could not delete booking: ' + e.message;
@@ -825,7 +834,7 @@ function setMode(mode) {
     currentProperty = 'all';
     turnaroundDays = new Map();
     allBookings = makeDemoBookings();
-    turnaroundDays = findTurnarounds(allBookings);
+    refreshTurnarounds();
     console.log('[demo] allBookings count:', allBookings.length);
     console.log('[demo] turnaroundDays:', [...turnaroundDays].map(([pid, days]) => ({ pid, dates: [...days.keys()] })));
     console.log('[demo] sample starts/ends:', allBookings.slice(0,4).map(b => ({
