@@ -567,7 +567,7 @@ function sendJson(res, status, payload) {
 
 // ─────────────────────────────────────────────────────────────
 
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -852,6 +852,20 @@ const server = http.createServer(async (req, res) => {
   }
 
   res.writeHead(404); res.end("Not found");
+}
+
+// A bug in one request must not take the whole server down. Without this,
+// an error thrown inside handleRequest becomes an unhandled promise
+// rejection, which stops the Node process.
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch(err => {
+    console.error(`[error] ${req.method} ${req.url} failed:`, err);
+    if (!res.headersSent) {
+      sendJson(res, 500, { error: "Something went wrong. Please try again." });
+    } else {
+      res.destroy();
+    }
+  });
 });
 
 const PORT = 3456;
