@@ -13,6 +13,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - **Turnarounds mixed up between properties** — turnaround days were tracked one per date across all properties, so with more than one property a checkout could hide another property's same-day swap, a "new guest arriving" reminder could be dropped, and the month calendar could show a turnaround dot belonging to a property that wasn't selected. Turnarounds are now tracked per property — closes #61
+- **One failing request could stop the server** — an unexpected error while handling any request ended the whole process, taking the dashboard and booking page down until it was restarted. The failing request now gets an error response, the error is logged with its details, and the server keeps running
 
 ## [1.4.0] — 2026-11-11
 
