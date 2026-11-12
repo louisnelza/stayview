@@ -2,7 +2,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
+const { parseIcal, localYmd, parseYmd, isValidYmd, nightsBetween, datesInRange, fmtFull, SOURCE_LABELS } = require("./js/shared.js");
 const { KnownUidStore } = require("./booking-diff.js");
 
 // ── Config loading ───────────────────────────────────────────
@@ -271,26 +271,32 @@ function cacheFreshSource(property, name, text) {
   return result;
 }
 
+// Requests for the same feed while a fetch is under way share that fetch.
+const refreshesInFlight = new Map();
+
+// Fetch one feed and, if it is a real calendar, cache it. Throws when the
+// fetch fails or the response isn't iCal, leaving the cache untouched so
+// the last good copy is kept.
+function refreshSource(property, name, srcUrl) {
+  const key = `${property.id}:${name}`;
+  if (refreshesInFlight.has(key)) return refreshesInFlight.get(key);
+  const pending = (async () => {
+    const text = await fetchUrl(srcUrl);
+    if (!text.includes('BEGIN:VCALENDAR')) throw new Error('No VCALENDAR');
+    const result = cacheFreshSource(property, name, text);
+    console.log(`  [P${property.id}:${name}] OK (${text.length} chars)`);
+    return result;
+  })().finally(() => refreshesInFlight.delete(key));
+  refreshesInFlight.set(key, pending);
+  return pending;
+}
+
 async function fetchPropertySources(property) {
   const entries = Object.entries(property.sources).filter(([, u]) => u);
   return Promise.all(entries.map(async ([name, srcUrl]) => {
     const cacheKey = `${property.id}:${name}`;
     try {
-      const text = await fetchUrl(srcUrl);
-      const hasCalendar = text.includes('BEGIN:VCALENDAR');
-      if (!hasCalendar) {
-        console.log(`  [P${property.id}:${name}] INVALID — no VCALENDAR`);
-        // Don't update cache — keep last known good data
-        const cached = serverSourceCache[cacheKey];
-        if (cached) {
-          console.log(`  [P${property.id}:${name}] Serving cached data from ${cached.fetchedAt.toLocaleTimeString()}`);
-          return { ...cached.result, stale: true };
-        }
-        return { name, propertyId: property.id, success: false, data: '', error: 'No VCALENDAR' };
-      }
-      const result = cacheFreshSource(property, name, text);
-      console.log(`  [P${property.id}:${name}] OK (${text.length} chars)`);
-      return result;
+      return await refreshSource(property, name, srcUrl);
     } catch(e) {
       console.log(`  [P${property.id}:${name}] FAILED: ${e.message}`);
       // Serve last known good data if available
@@ -353,10 +359,7 @@ function startCachePrimer() {
     console.log(`[cache] Retrying ${uncached.length} uncached source${uncached.length > 1 ? 's' : ''}...`);
     await Promise.all(uncached.map(async ({ prop, name, url }) => {
       try {
-        const text = await fetchUrl(url);
-        const hasCalendar = text.includes('BEGIN:VCALENDAR');
-        if (!hasCalendar) { console.log(`  [${name}] retry: invalid iCal`); return; }
-        cacheFreshSource(prop, name, text);
+        await refreshSource(prop, name, url);
         console.log(`  [${name}] retry: cached successfully`);
       } catch(e) {
         console.log(`  [${name}] retry: still failing — ${e.message}`);
@@ -449,23 +452,6 @@ function getPropertyConfig() {
   };
 }
 
-function parseIcalDates(text) {
-  const blocked = [];
-  const events = text.split("BEGIN:VEVENT");
-  events.shift();
-  for (const ev of events) {
-    const get = k => { const m = ev.match(new RegExp(k + "[^:]*:([^\r\n]+)")); return m ? m[1].trim() : ""; };
-    const dtstart = get("DTSTART"), dtend = get("DTEND");
-    if (!dtstart || !dtend) continue;
-    const start = parseDate(dtstart), end = parseDate(dtend);
-    if (isNaN(start) || isNaN(end)) continue;
-    for (let d = new Date(start); d < end; d.setDate(d.getDate()+1)) {
-      blocked.push(localYmd(d));
-    }
-  }
-  return blocked;
-}
-
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -493,30 +479,58 @@ function sendAppFile(res, relPath, contentType, notFoundMessage) {
   res.end(body);
 }
 
-// Every night that is already taken, as a Set of YYYY-MM-DD strings:
-// nights blocked on the platform iCal feeds plus direct bookings.
-async function getBlockedDates() {
-  const blockedDates = new Set();
-  // Platform iCal blocked dates
-  await Promise.all(Object.values(getSources()).filter(Boolean).map(async srcUrl => {
-    try {
-      const text = await fetchUrl(srcUrl);
-      parseIcalDates(text).forEach(d => blockedDates.add(d));
-    } catch(e) {}
+// ── Availability for the booking page ────────────────────────
+// The page loads availability from the feed cache when it is recent, so
+// opening /book doesn't hit every platform each time.
+const AVAILABILITY_CACHE_MS = 10 * 60 * 1000;
+// A booking re-reads every feed. If a platform can't be reached, its cached
+// copy is trusted only if it is this recent; otherwise the booking is
+// refused rather than treating that platform's nights as free.
+const BOOKING_FALLBACK_MAX_AGE_MS = 60 * 60 * 1000;
+
+// Nights taken on the platform feeds of the booking page's property, as a
+// Set of YYYY-MM-DD strings. Every event blocks its nights, including ones
+// a platform marks as blocked rather than booked.
+//   reuseIfNewerThanMs — use a cached feed this recent without refetching
+//   fallbackMaxAgeMs   — if a fetch fails, accept a cached copy this recent
+// `unreadable` lists the feeds that could not be read or trusted, so the
+// caller can tell the result is incomplete.
+async function getPlatformTakenNights({ reuseIfNewerThanMs, fallbackMaxAgeMs }) {
+  const nights = new Set();
+  const unreadable = [];
+  const property = getProperties()[0];
+  if (!property) return { nights, unreadable };
+
+  await Promise.all(Object.entries(property.sources).filter(([, url]) => url).map(async ([name, url]) => {
+    const cached = serverSourceCache[`${property.id}:${name}`];
+    const ageMs = cached ? Date.now() - cached.fetchedAt : Infinity;
+    let text = null;
+    if (cached && ageMs <= reuseIfNewerThanMs) {
+      text = cached.result.data;
+    } else {
+      try {
+        text = (await refreshSource(property, name, url)).data;
+      } catch(e) {
+        console.log(`  [P${property.id}:${name}] availability check FAILED: ${e.message}`);
+        if (cached && ageMs <= fallbackMaxAgeMs) {
+          console.log(`  [P${property.id}:${name}] using cached copy from ${Math.round(ageMs / 60000)} min ago`);
+          text = cached.result.data;
+        }
+      }
+    }
+    if (text === null) { unreadable.push(name); return; }
+    for (const b of parseIcal(text, name, property.id)) {
+      datesInRange(b.start, b.end).forEach(d => nights.add(d));
+    }
   }));
-  addDirectBookingNights(blockedDates);
-  return blockedDates;
+  return { nights, unreadable };
 }
 
 // Synchronous on purpose — /api/book calls it immediately before saving,
 // with no await in between, so two requests can't both pass the check.
-function addDirectBookingNights(blockedDates) {
-  loadBookings().forEach(b => {
-    const d = parseYmd(b.checkin);
-    const end = parseYmd(b.checkout);
-    while (d < end) { blockedDates.add(localYmd(d)); d.setDate(d.getDate()+1); }
-  });
-  return blockedDates;
+function addDirectBookingNights(takenNights) {
+  loadBookings().forEach(b => datesInRange(b.checkin, b.checkout).forEach(d => takenNights.add(d)));
+  return takenNights;
 }
 
 function sendJson(res, status, payload) {
@@ -667,7 +681,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === "/api/availability") {
-    sendJson(res, 200, { blocked: [...await getBlockedDates()] });
+    const { nights, unreadable } = await getPlatformTakenNights({
+      reuseIfNewerThanMs: AVAILABILITY_CACHE_MS,
+      fallbackMaxAgeMs: Infinity,   // an old copy still shows nights that were taken
+    });
+    // complete: false means a platform has never been read, so some taken
+    // nights may be missing. /api/book re-checks before accepting anything.
+    sendJson(res, 200, { blocked: [...addDirectBookingNights(nights)], complete: unreadable.length === 0 });
     return;
   }
 
@@ -705,13 +725,20 @@ const server = http.createServer(async (req, res) => {
       // Refuse nights that are already taken. The page only offers free
       // dates, but its view can be stale (two guests booking at once) and
       // the endpoint can be called directly. Platform feeds are fetched
-      // first; direct bookings are re-read right before saving.
-      const taken = addDirectBookingNights(await getBlockedDates());
-      for (const d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
-        if (taken.has(localYmd(d))) {
-          sendJson(res, 409, { error: "Sorry, those dates have just been taken. Please choose different dates." });
-          return;
-        }
+      // fresh first; direct bookings are re-read right before saving.
+      const { nights: platformNights, unreadable } = await getPlatformTakenNights({
+        reuseIfNewerThanMs: 0,
+        fallbackMaxAgeMs: BOOKING_FALLBACK_MAX_AGE_MS,
+      });
+      if (unreadable.length > 0) {
+        console.warn(`  [direct booking] Refused ${checkin} to ${checkout} — could not check ${unreadable.join(", ")}`);
+        sendJson(res, 503, { error: "We can't confirm availability right now. Please try again in a few minutes." });
+        return;
+      }
+      const taken = addDirectBookingNights(platformNights);
+      if (datesInRange(checkin, checkout).some(d => taken.has(d))) {
+        sendJson(res, 409, { error: "Sorry, those dates have just been taken. Please choose different dates." });
+        return;
       }
       const booking = {
         uid: "direct-" + Date.now(),

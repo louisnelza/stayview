@@ -27,7 +27,7 @@ async function init() {
       fetch('/api/availability').then(r => r.json()),
     ]);
     property     = propRes;
-    blockedDates = new Set(availRes.blocked || []);
+    setAvailability(availRes);
 
     // Property info
     $('prop-name').textContent  = property.name;
@@ -91,17 +91,6 @@ $('guests-plus').onclick  = () => setGuests(+$('guests').value + 1);
 
 function isDateBlocked(dateStr) {
   return blockedDates.has(dateStr);
-}
-
-function datesInRange(checkin, checkout) {
-  const dates = [];
-  let d = parseYmd(checkin);
-  const end = parseYmd(checkout);
-  while (d < end) {
-    dates.push(localYmd(d));
-    d.setDate(d.getDate() + 1);
-  }
-  return dates;
 }
 
 // Latest possible check-out for a given check-in: the first taken night
@@ -401,14 +390,20 @@ async function submitBooking() {
 // calendar. Their details stay in the form for the next attempt.
 async function datesJustTaken(message) {
   try {
-    const avail = await fetch('/api/availability').then(r => r.json());
-    blockedDates = new Set(avail.blocked || []);
+    setAvailability(await fetch('/api/availability').then(r => r.json()));
   } catch(e) {}
   sel.in = sel.out = previewOut = '';
   onDatesChange();
   $('avail-msg').className   = 'avail-msg unavailable';
   $('avail-msg').textContent = message || 'Sorry, those dates have just been taken. Please choose different dates.';
   $('dates-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// complete: false means the server couldn't read every platform calendar,
+// so some taken nights may be missing. The server re-checks on submit.
+function setAvailability(avail) {
+  blockedDates = new Set(avail.blocked || []);
+  $('avail-note').hidden = avail.complete !== false;
 }
 
 // ── Start ─────────────────────────────────────────────────────
