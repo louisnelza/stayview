@@ -102,6 +102,11 @@ Open `http://localhost:3456` in your browser.
 
 Guests can book directly at `http://your-server:3456/book` without going through a platform.
 
+**Double-booking protection.** The page shows a night as taken if it is booked or blocked on any platform feed, or already has a direct booking. When a guest sends a request, the server fetches every platform feed again before accepting it:
+
+- If a platform can't be reached, its cached copy is used only if it is under an hour old. Otherwise the request is refused with "We can't confirm availability right now", rather than treating that platform's nights as free.
+- To keep the page fast, it reuses feeds fetched in the last 10 minutes. If a platform has never been read successfully, the page tells guests that some dates shown as free may already be taken.
+
 To manually capture a walk-in or phone booking, add an entry to `bookings.json` in the same folder as `server.js`:
 
 ```json

@@ -75,6 +75,17 @@ function nightsBetween(start, end) {
   return Math.round((end - start) / 86400000);
 }
 
+// Every night of a stay, as YYYY-MM-DD strings: the check-in date up to
+// but not including the check-out date. Takes Dates or YYYY-MM-DD strings.
+// Steps by calendar day, so stays across a DST change are counted right.
+function datesInRange(start, end) {
+  const toDate = x => (x instanceof Date ? new Date(x) : parseYmd(x));
+  const dates = [];
+  const last = toDate(end);
+  for (const d = toDate(start); d < last; d.setDate(d.getDate() + 1)) dates.push(localYmd(d));
+  return dates;
+}
+
 function getStatus(b) {
   const now = today();
   if (b.start > now)  return 'upcoming';
@@ -286,5 +297,5 @@ function escHtml(s) {
 // ── Node export ───────────────────────────────────────────────
 // Lets server.js reuse the iCal parser. No-op in the browser.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, fmtFull, SOURCE_LABELS, TURNAROUND_GAP_DAYS, findTurnarounds, turnaroundOn, hasTurnaroundOn, countTurnaroundsInMonth };
+  module.exports = { parseIcal, parseDate, localYmd, parseYmd, isValidYmd, nightsBetween, datesInRange, fmtFull, SOURCE_LABELS, TURNAROUND_GAP_DAYS, findTurnarounds, turnaroundOn, hasTurnaroundOn, countTurnaroundsInMonth };
 }
