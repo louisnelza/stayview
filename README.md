@@ -131,6 +131,8 @@ To manually capture a walk-in or phone booking, add an entry to `bookings.json` 
 
 Click **Refresh** in the dashboard header to load the new booking. Direct bookings appear in purple and can be deleted from the dashboard with the bin button on their card.
 
+If `bookings.json` can't be read after an edit — a missing comma, a stray bracket, or anything that isn't a list of bookings — StayView pauses direct bookings rather than risk overwriting the file. The dashboard shows a warning, guests are asked to try again later, and the file is left exactly as it is. Fix the mistake (a JSON validator will point to it) and click **Refresh**.
+
 ## Where to find your iCal URLs
 
 | Platform | Location |

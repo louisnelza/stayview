@@ -416,16 +416,43 @@ function getBookingsPath() {
   return path.join(getBaseDir(), "bookings.json");
 }
 
+// bookings.json exists but can't be read as a list of bookings — for
+// example a typo after editing it by hand. It must never be treated as
+// empty: the next save would overwrite it and lose every direct booking.
+class BookingsFileError extends Error {}
+
+const BOOKINGS_UNREADABLE_FOR_HOST =
+  "bookings.json could not be read, so direct bookings are paused. Fix or restore the file; StayView has not changed it.";
+const BOOKINGS_UNREADABLE_FOR_GUEST =
+  "We can't take bookings right now. Please try again later.";
+
+// No file yet means no direct bookings. Throws BookingsFileError if the
+// file exists but can't be read or isn't a list.
 function loadBookings() {
+  const p = getBookingsPath();
+  let data;
   try {
-    const p = getBookingsPath();
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf8"));
-  } catch(e) {}
-  return [];
+    data = JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch(e) {
+    if (e.code === "ENOENT") return [];
+    console.error(`[bookings] ${p} could not be read (${e.message}). Direct bookings are paused until it is fixed; the file has not been changed.`);
+    throw new BookingsFileError(e.message);
+  }
+  if (!Array.isArray(data)) {
+    console.error(`[bookings] ${p} is not a list of bookings. Direct bookings are paused until it is fixed; the file has not been changed.`);
+    throw new BookingsFileError("not a list of bookings");
+  }
+  return data;
 }
 
+// Write to a temporary file, then rename it over bookings.json, so a crash
+// or power cut mid-save leaves either the old file or the new one, never
+// a half-written one.
 function saveBookings(bookings) {
-  fs.writeFileSync(getBookingsPath(), JSON.stringify(bookings, null, 2));
+  const p = getBookingsPath();
+  const tmp = p + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(bookings, null, 2));
+  fs.renameSync(tmp, p);
 }
 
 // Details of the property the booking page sells. The page handles one
@@ -687,7 +714,16 @@ const server = http.createServer(async (req, res) => {
     });
     // complete: false means a platform has never been read, so some taken
     // nights may be missing. /api/book re-checks before accepting anything.
-    sendJson(res, 200, { blocked: [...addDirectBookingNights(nights)], complete: unreadable.length === 0 });
+    // If bookings.json can't be read, show what the platforms say and mark
+    // the result incomplete; /api/book refuses bookings until it is fixed.
+    let directReadable = true;
+    try {
+      addDirectBookingNights(nights);
+    } catch(e) {
+      if (!(e instanceof BookingsFileError)) throw e;
+      directReadable = false;
+    }
+    sendJson(res, 200, { blocked: [...nights], complete: unreadable.length === 0 && directReadable });
     return;
   }
 
@@ -758,6 +794,11 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ success: true, booking }));
     } catch(e) {
+      if (e instanceof BookingsFileError) {
+        console.warn(`  [direct booking] Refused — bookings.json could not be read`);
+        sendJson(res, 503, { error: BOOKINGS_UNREADABLE_FOR_GUEST });
+        return;
+      }
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: e.message }));
     }
@@ -766,15 +807,26 @@ const server = http.createServer(async (req, res) => {
 
   // ── API: list direct bookings (for dashboard) ─────────────────
   if (pathname === "/api/bookings") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(loadBookings()));
+    try {
+      sendJson(res, 200, loadBookings());
+    } catch(e) {
+      if (!(e instanceof BookingsFileError)) throw e;
+      sendJson(res, 500, { error: BOOKINGS_UNREADABLE_FOR_HOST });
+    }
     return;
   }
 
   // ── API: delete a direct booking ──────────────────────────────
   if (pathname.startsWith("/api/bookings/") && req.method === "DELETE") {
     const uid = decodeURIComponent(pathname.replace("/api/bookings/", ""));
-    const bookings = loadBookings();
+    let bookings;
+    try {
+      bookings = loadBookings();
+    } catch(e) {
+      if (!(e instanceof BookingsFileError)) throw e;
+      sendJson(res, 500, { error: BOOKINGS_UNREADABLE_FOR_HOST });
+      return;
+    }
     const idx = bookings.findIndex(b => b.uid === uid);
     if (idx === -1) {
       res.writeHead(404, { "Content-Type": "application/json" });

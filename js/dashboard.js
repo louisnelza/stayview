@@ -86,22 +86,26 @@ async function loadAll(force = false) {
     try {
       const directRes  = await fetch('/api/bookings');
       const directData = await directRes.json();
-      directData.forEach(b => {
-        allBookings.push({
-          uid:       b.uid,
-          source:    'direct',
-          summary:   b.name,
-          start:     parseYmd(b.checkin),
-          end:       parseYmd(b.checkout),
-          nights:    b.nights,
-          isBlocked: false,
-          details:   null,
-          propertyId: b.propertyId || 1,
-          status:    b.status,
-          email:     b.email,
-          phone:     b.phone,
+      if (!directRes.ok) {
+        warnings.push(`<strong>Direct bookings</strong>: ${escHtml(directData.error || 'could not be loaded')}`);
+      } else {
+        directData.forEach(b => {
+          allBookings.push({
+            uid:       b.uid,
+            source:    'direct',
+            summary:   b.name,
+            start:     parseYmd(b.checkin),
+            end:       parseYmd(b.checkout),
+            nights:    b.nights,
+            isBlocked: false,
+            details:   null,
+            propertyId: b.propertyId || 1,
+            status:    b.status,
+            email:     b.email,
+            phone:     b.phone,
+          });
         });
-      });
+      }
     } catch(e) { console.warn('Could not load direct bookings:', e); }
 
     allBookings.sort((a, b) => a.start - b.start);
