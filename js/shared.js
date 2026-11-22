@@ -246,10 +246,10 @@ function unfoldIcal(text) {
   return text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
 }
 
-// Unescape iCal \n \, \; \\ sequences
+// Unescape iCal \n (or \N) \, \; \\ sequences
 function unescapeIcal(s) {
   return s
-    .replace(/\\n/g, '\n')
+    .replace(/\\[nN]/g, '\n')
     .replace(/\\,/g, ',')
     .replace(/\\;/g, ';')
     .replace(/\\\\/g, '\\')
@@ -258,29 +258,37 @@ function unescapeIcal(s) {
 
 // Parse all structured fields from a Lekkeslaap SUMMARY value
 // Format: "Reference: LS-XXXXX \nCustomer: Name \nEmail: x \nCell: y \nView at: url"
-function parseLekkeslaapSummary(rawSummary) {
+// The link is also picked up when it isn't labelled "View at:", from the
+// summary or the description, so the card can always offer it as a link.
+function parseLekkeslaapSummary(rawSummary, description = '') {
   const text = unescapeIcal(rawSummary);
   const get = key => {
     const m = text.match(new RegExp(key + ':\\s*(.+?)(?:\\n|$)', 'i'));
     return m ? m[1].trim() : null;
   };
+  const anyUrl = s => (s.match(/https?:\/\/\S+/i) || [null])[0];
   return {
     reference: get('Reference'),
     name:      get('Customer'),
     email:     get('Email'),
     cell:      get('Cell'),
-    viewUrl:   get('View at'),
+    viewUrl:   get('View at') || anyUrl(text) || anyUrl(unescapeIcal(description)),
   };
 }
 
 function extractGuestName(summary, description, source) {
   if (source === 'lekkeslaap') {
-    const parsed = parseLekkeslaapSummary(summary);
+    const parsed = parseLekkeslaapSummary(summary, description);
     if (parsed.name) return parsed.name;
   }
   if (source === 'booking') return 'Booking.com Guest';
   if (source === 'airbnb' && /^reserved$/i.test(summary.trim())) return 'Airbnb Guest';
-  return summary.split('(')[0].replace(/\n.*/s, '').trim() || 'Guest';
+  const name = summary.split('(')[0].replace(/\n.*/s, '').trim();
+  // A link or a "Label: value" line is not a name — Lekkeslaap sometimes
+  // sends only the booking link, which would otherwise become the heading
+  const notAName = /:\/\//.test(name) || (source === 'lekkeslaap' && /^[\w ]+:/.test(name));
+  if (notAName) return source === 'lekkeslaap' ? 'Lekkeslaap Guest' : 'Guest';
+  return name || 'Guest';
 }
 
 function parseIcal(text, source, propertyId = 1) {
@@ -317,7 +325,7 @@ function parseIcal(text, source, propertyId = 1) {
     let details = null;
     let provisional = false;
     if (source === 'lekkeslaap' && !isBlocked) {
-      details = parseLekkeslaapSummary(rawSummary);
+      details = parseLekkeslaapSummary(rawSummary, description);
       // Provisional booking — Lekkeslaap sends reference + view URL but no guest name yet
       provisional = !!(details && details.reference && !details.name);
     }
