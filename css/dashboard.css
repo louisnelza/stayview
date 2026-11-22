@@ -278,10 +278,6 @@ main { padding: 0 32px 72px; max-width: 1400px; margin: 0 auto; }
 .tl-bar.short { padding: 0; color: transparent; }
 .tl-bar.is-past { opacity: .42; }
 .tl-bar.is-blocked { color: var(--text-2); font-weight: 500; box-shadow: inset 0 0 0 1px var(--line); }
-.tl-bar.is-provisional {
-  background: color-mix(in srgb, var(--src) 16%, transparent);
-  color: var(--src); box-shadow: inset 0 0 0 1.5px var(--src);
-}
 .tl-bar.dim, .tl.has-hl .tl-bar:not(.is-hl) { opacity: .16; }
 
 /* ── Filters ──────────────────────────────────────────────────*/
@@ -358,7 +354,6 @@ main { padding: 0 32px 72px; max-width: 1400px; margin: 0 auto; }
 .badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge-checking-in, .badge-checking-out { background: rgba(240, 228, 201, .12); color: var(--cream); }
 .badge-past { color: var(--text-3); }
-.badge-provisional { background: transparent; box-shadow: inset 0 0 0 1px rgba(240, 228, 201, .4); color: var(--cream); }
 .badge-property { background: transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
 
 .bk-side { display: flex; align-items: center; gap: 14px; }

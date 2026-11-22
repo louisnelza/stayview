@@ -277,17 +277,17 @@ function parseLekkeslaapSummary(rawSummary, description = '') {
 }
 
 function extractGuestName(summary, description, source) {
+  // Lekkeslaap's summary is "Label: value" lines, so without a Customer line
+  // there is no name in it. Its feed looks the same for provisional and
+  // confirmed bookings (#80), so the fallback doesn't claim either status.
   if (source === 'lekkeslaap') {
-    const parsed = parseLekkeslaapSummary(summary, description);
-    if (parsed.name) return parsed.name;
+    return parseLekkeslaapSummary(summary, description).name || 'Lekkeslaap Booking';
   }
   if (source === 'booking') return 'Booking.com Guest';
   if (source === 'airbnb' && /^reserved$/i.test(summary.trim())) return 'Airbnb Guest';
   const name = summary.split('(')[0].replace(/\n.*/s, '').trim();
-  // A link or a "Label: value" line is not a name — Lekkeslaap sometimes
-  // sends only the booking link, which would otherwise become the heading
-  const notAName = /:\/\//.test(name) || (source === 'lekkeslaap' && /^[\w ]+:/.test(name));
-  if (notAName) return source === 'lekkeslaap' ? 'Lekkeslaap Guest' : 'Guest';
+  // A link is not a name, and would otherwise become the card heading
+  if (/:\/\//.test(name)) return 'Guest';
   return name || 'Guest';
 }
 
@@ -323,20 +323,15 @@ function parseIcal(text, source, propertyId = 1) {
 
     // Parse all available fields for Lekkeslaap
     let details = null;
-    let provisional = false;
     if (source === 'lekkeslaap' && !isBlocked) {
       details = parseLekkeslaapSummary(rawSummary, description);
-      // Provisional booking — Lekkeslaap sends reference + view URL but no guest name yet
-      provisional = !!(details && details.reference && !details.name);
     }
 
     const summary = isBlocked
       ? (rawSummary || description || 'Blocked')
-      : provisional
-        ? 'Provisional Booking'
-        : extractGuestName(rawSummary, description, source);
+      : extractGuestName(rawSummary, description, source);
 
-    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details, propertyId, provisional });
+    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details, propertyId });
   }
   return bookings;
 }
