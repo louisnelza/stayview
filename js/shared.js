@@ -246,10 +246,10 @@ function unfoldIcal(text) {
   return text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
 }
 
-// Unescape iCal \n \, \; \\ sequences
+// Unescape iCal \n (or \N) \, \; \\ sequences
 function unescapeIcal(s) {
   return s
-    .replace(/\\n/g, '\n')
+    .replace(/\\[nN]/g, '\n')
     .replace(/\\,/g, ',')
     .replace(/\\;/g, ';')
     .replace(/\\\\/g, '\\')
@@ -258,29 +258,37 @@ function unescapeIcal(s) {
 
 // Parse all structured fields from a Lekkeslaap SUMMARY value
 // Format: "Reference: LS-XXXXX \nCustomer: Name \nEmail: x \nCell: y \nView at: url"
-function parseLekkeslaapSummary(rawSummary) {
+// The link is also picked up when it isn't labelled "View at:", from the
+// summary or the description, so the card can always offer it as a link.
+function parseLekkeslaapSummary(rawSummary, description = '') {
   const text = unescapeIcal(rawSummary);
   const get = key => {
     const m = text.match(new RegExp(key + ':\\s*(.+?)(?:\\n|$)', 'i'));
     return m ? m[1].trim() : null;
   };
+  const anyUrl = s => (s.match(/https?:\/\/\S+/i) || [null])[0];
   return {
     reference: get('Reference'),
     name:      get('Customer'),
     email:     get('Email'),
     cell:      get('Cell'),
-    viewUrl:   get('View at'),
+    viewUrl:   get('View at') || anyUrl(text) || anyUrl(unescapeIcal(description)),
   };
 }
 
 function extractGuestName(summary, description, source) {
+  // Lekkeslaap's summary is "Label: value" lines, so without a Customer line
+  // there is no name in it. Its feed looks the same for provisional and
+  // confirmed bookings (#80), so the fallback doesn't claim either status.
   if (source === 'lekkeslaap') {
-    const parsed = parseLekkeslaapSummary(summary);
-    if (parsed.name) return parsed.name;
+    return parseLekkeslaapSummary(summary, description).name || 'Lekkeslaap Booking';
   }
   if (source === 'booking') return 'Booking.com Guest';
   if (source === 'airbnb' && /^reserved$/i.test(summary.trim())) return 'Airbnb Guest';
-  return summary.split('(')[0].replace(/\n.*/s, '').trim() || 'Guest';
+  const name = summary.split('(')[0].replace(/\n.*/s, '').trim();
+  // A link is not a name, and would otherwise become the card heading
+  if (/:\/\//.test(name)) return 'Guest';
+  return name || 'Guest';
 }
 
 function parseIcal(text, source, propertyId = 1) {
@@ -315,20 +323,15 @@ function parseIcal(text, source, propertyId = 1) {
 
     // Parse all available fields for Lekkeslaap
     let details = null;
-    let provisional = false;
     if (source === 'lekkeslaap' && !isBlocked) {
-      details = parseLekkeslaapSummary(rawSummary);
-      // Provisional booking — Lekkeslaap sends reference + view URL but no guest name yet
-      provisional = !!(details && details.reference && !details.name);
+      details = parseLekkeslaapSummary(rawSummary, description);
     }
 
     const summary = isBlocked
       ? (rawSummary || description || 'Blocked')
-      : provisional
-        ? 'Provisional Booking'
-        : extractGuestName(rawSummary, description, source);
+      : extractGuestName(rawSummary, description, source);
 
-    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details, propertyId, provisional });
+    bookings.push({ uid, source, summary, start, end, nights, isBlocked, details, propertyId });
   }
   return bookings;
 }

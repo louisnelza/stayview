@@ -484,7 +484,6 @@ function renderTimeline() {
         clipL && 'clip-l', clipR && 'clip-r',
         e - s < 2 && 'short',
         b.isBlocked && 'is-blocked',
-        b.provisional && 'is-provisional',
         b.end < now && 'is-past',
       ].filter(Boolean).join(' ');
       const label = b.isBlocked ? 'Blocked' : (b.summary || 'Guest');
@@ -665,7 +664,6 @@ function renderBookings() {
           <div class="badge-row">
             <span class="badge badge-src">${escHtml(srcLabel)}</span>
             ${b.isBlocked ? '' : `<span class="badge badge-${status}">${statusLabel(b, status)}</span>`}
-            ${b.provisional ? '<span class="badge badge-provisional">Provisional</span>' : ''}
             ${blockedEverywhere ? `<span class="badge badge-blocked-ok">Blocked on ${escHtml(platformNames(blockCheck.checked))}</span>` : ''}
             ${propName ? `<span class="badge badge-property">${escHtml(propName)}</span>` : ''}
           </div>

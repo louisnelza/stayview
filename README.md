@@ -29,7 +29,6 @@ A self-hosted dashboard that aggregates bookings from **Airbnb**, **Booking.com*
 - **Auto-refresh** — server-side polling keeps data current without manual refresh
 - **Platform downtime resilience** — cached iCal data served when a platform is temporarily unavailable
 - **Lekkeslaap guest details** — reference number, email, cell and supplier link on booking cards
-- **Provisional booking detection** — flags Lekkeslaap bookings awaiting confirmation
 - **Demo mode** — realistic sample data, works without any credentials
 - **Self-hosted** — runs on a Raspberry Pi, no cloud subscription required
 
